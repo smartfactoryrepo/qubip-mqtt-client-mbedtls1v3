@@ -11,17 +11,17 @@ This example demonstrates how to establish a secure connection to a MQTT broker 
 ## Requirements ✅
 
 * **NUCLEO-F429ZI board:** This example is specifically tailored for the NUCLEO-F429ZI development board. 
-* **Mbed TLS library:** STM32CubeIDE 1.16.0 📥
-* **MQTT client library:** You'll need an MQTT client library that supports TLS connections. 🧩
+* **IDE:** STM32CubeIDE 1.16.0 📥
+* **MQTT broker:** You'll need an MQTT broker that supports TLS 1.3 connections. 🧩
 
 ## How to Run 🚀
 
 1. **Compile:**
-   * Compile the example code along with your chosen MQTT client library and Mbed TLS, making sure to configure the project for the NUCLEO-F429ZI target. 🧑‍💻
+    Compile the example code along with your chosen MQTT broker server and TLS version. 🧑‍💻
 
 2. **Execute:**
-   * Flash the compiled code onto the NUCLEO-F429ZI board. 
-   * Run the code on the board. 🏃‍♀️
+    Flash the compiled code onto the NUCLEO-F429ZI board. 
+    Run the code on the board. 🏃‍♀️
 
 ## Important Notes ⚠️
 
