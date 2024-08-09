@@ -134,6 +134,7 @@ typedef struct MQTTClient
 
 #define DefaultClient {0, 0, 0, 0, NULL, NULL, 0, 0, 0}
 
+void MQTTCloseSession(MQTTClient* c);
 
 /**
  * Create an MQTT client object

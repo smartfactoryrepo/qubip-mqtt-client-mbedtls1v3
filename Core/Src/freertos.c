@@ -70,11 +70,9 @@ osThreadId mqttClientPubTaskHandle;  //mqtt client task handle
 Network net; //mqtt network
 MQTTClient mqttClient; //mqtt client
 
-uint8_t sndBuffer[MQTT_BUFSIZE * 10]; //mqtt send buffer
-uint8_t rcvBuffer[MQTT_BUFSIZE * 10]; //mqtt receive buffer
-uint8_t msgBuffer[MQTT_BUFSIZE * 10]; //mqtt message buffer
-
-uint8_t pause = 0;
+uint8_t sndBuffer[MQTT_BUFSIZE]; //mqtt send buffer
+uint8_t rcvBuffer[MQTT_BUFSIZE]; //mqtt receive buffer
+uint8_t msgBuffer[MQTT_BUFSIZE]; //mqtt message buffer
 
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
@@ -87,13 +85,16 @@ osThreadId defaultTaskHandle;
 0x10000 bytes starting from address 0x80000000, and the second a block of
 0xa0000 bytes starting from address 0x90000000.  The block starting at
 0x80000000 has the lower start address so appears in the array fist. */
-volatile uint8_t heap[98304] = { 0 }; // 192kb / 2
+
+#define RAM_REGION_HEAP_SIZE 49152
+
+volatile uint8_t heap[RAM_REGION_HEAP_SIZE] = { 0 }; // 192kb / 4
 
 const HeapRegion_t xHeapRegions[] =
 {
+	// Point to ccmram
     { ( uint8_t * ) 0x10000000UL, 0xFFFE },
-    //{ ( uint8_t * ) 0x20000000UL, 0x18000 },
-	{ ( uint8_t * ) &heap, 0x18000 },
+	{ ( uint8_t * ) &heap, RAM_REGION_HEAP_SIZE },
     { NULL, 0 } /* Terminates the array. */
 };
 
@@ -233,53 +234,14 @@ void vApplicationGetTimerTaskMemory( StaticTask_t **ppxTimerTaskTCBBuffer,
     *pulTimerTaskStackSize = configTIMER_TASK_STACK_DEPTH;
 }
 
-// Struttura per memorizzare la dimensione delle allocazioni
-typedef struct allocation_t {
-    void *ptr;
-    size_t size;
-    struct allocation_t *next;
-} allocation_t;
-
-// Lista delle allocazioni
-static allocation_t *allocations = NULL;
-static size_t total_memory_allocated = 0;
-
 
 void* my_calloc(size_t nmemb, size_t size)
 {
-	size_t total_size = nmemb * size;
 	void *ptr = pvPortCalloc(nmemb, size);
-	if (ptr != NULL)
+	if (ptr == NULL)
 	{
-		/*
-		allocation_t *new_allocation = (allocation_t *)pvPortMalloc(sizeof(allocation_t));
-		if (new_allocation != NULL)
-		{
-			new_allocation->ptr = ptr;
-			new_allocation->size = total_size;
-			new_allocation->next = allocations;
-			allocations = new_allocation;
-			total_memory_allocated += total_size;
-
-			LOG_DEBUG("Allocated: %u bytes, Total allocated: %u bytes\r\n", (unsigned int)total_size, (unsigned int)total_memory_allocated);
-		}
-		else
-		{
-			// Fallisce l'allocazione di tracking
-			vPortFree(ptr);
-			ptr = NULL;
-			LOG_DEBUG("Failed to allocate memory for tracking structure\r\n");
-		}
-		*/
+		LOG_DEBUG("Failed to allocate %u bytes\r\n", (unsigned int)(nmemb * size));
 	}
-	else
-	{
-		// Fallisce l'allocazione di tracking
-		//vPortFree(ptr);
-		//ptr = NULL;
-		LOG_DEBUG("Failed to allocate %u bytes\r\n", (unsigned int)total_size);
-	}
-
 	return ptr;
 }
 
@@ -287,23 +249,6 @@ void my_free(void *ptr)
 {
 	if (ptr != NULL)
 	{
-		/*
-		allocation_t **current = &allocations;
-	    while (*current != NULL)
-	    {
-	    	if ((*current)->ptr == ptr)
-	    	{
-	    		allocation_t *to_free = *current;
-	            *current = (*current)->next;
-	            total_memory_allocated -= to_free->size;
-	            LOG_DEBUG("Freed: %u bytes, Total allocated: %u bytes\r\n", (unsigned int)to_free->size, (unsigned int)total_memory_allocated);
-
-	            vPortFree(to_free);
-	            break;
-	        }
-	            current = &((*current)->next);
-	    }
-		 */
 	    vPortFree(ptr);
 	}
 }
@@ -322,7 +267,6 @@ void MX_FREERTOS_Init(void) {
   {
 	  // Gestione dell'errore
 	  LOG_DEBUG("\r\nmbedtls_platform_set_calloc_free failed\r\n");
-	  HardFault_Handler();
   }
   vPortDefineHeapRegions( xHeapRegions );
   /* USER CODE END Init */
@@ -374,7 +318,7 @@ void StartDefaultTask(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    osDelay(100);
   }
   /* USER CODE END StartDefaultTask */
 }
@@ -395,7 +339,7 @@ void MqttClientSubTask(void const *argument)
     {
       LOG_DEBUG("DHCP/Static IP O.K.\n");
       const uint32_t local_IP = gnetif.ip_addr.addr;
-      LOG_DEBUG("IP %d.%d.%d.%d\n\r",(local_IP & 0xff), ((local_IP >> 8) & 0xff), ((local_IP >> 16) & 0xff), (local_IP >> 24));
+      LOG_DEBUG("IP %lu.%lu.%lu.%lu\n\r",(local_IP & 0xff), ((local_IP >> 8) & 0xff), ((local_IP >> 16) & 0xff), (local_IP >> 24));
       break;
     }
   }
@@ -414,29 +358,22 @@ void MqttClientSubTask(void const *argument)
       MQTTYield(&mqttClient, 1000); //handle timer
       osDelay(100);
     }
-
-    if(HAL_GPIO_ReadPin(Button_GPIO_Port, Button_Pin) == GPIO_PIN_SET)
-    {
-     	osDelay(25);
-      	if(HAL_GPIO_ReadPin(Button_GPIO_Port, Button_Pin) == GPIO_PIN_SET)
-       	{
-       		pause = !pause;
-       		LOG_DEBUG((pause) ? "Pause\n" : "Resume\n");
-       	}
-    }
   }
 }
 
 void MqttClientPubTask(void const *argument)
 {
-  const char* str = "MQTT message from STM32";
+  char str[50];
+  //const char* str = "MQTT message from STM32";
   MQTTMessage message;
   uint32_t n = 0;
 
   while(1)
   {
-    if(mqttClient.isconnected && !pause)
+    if(mqttClient.isconnected)
     {
+      ++n;
+      snprintf(str, sizeof(str), "MQTT message from STM32: %lu", n);
       message.payload = (void*)str;
       message.payloadlen = strlen(str);
 
@@ -445,7 +382,7 @@ void MqttClientPubTask(void const *argument)
         MQTTCloseSession(&mqttClient);
         net_disconnect(&net);
       }
-      LOG_DEBUG("[%d] Ho inviato un messaggio!\n", ++n);
+      LOG_DEBUG("[%lu] Ho inviato un messaggio!\n", n);
       osDelay(1000);
     }
     else
