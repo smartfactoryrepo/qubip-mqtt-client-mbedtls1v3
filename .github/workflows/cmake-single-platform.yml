@@ -23,5 +23,5 @@ jobs:
     - name: Build with STM32CubeIDE action
       uses: xanderhendriks/action-build-stm32cubeide@v13.0
       with:
-        project-path: 'applications/sample_application/targets/STM32'
-        project-target: 'qubip-mqtt-client-mbedtls1v3/Debug'
+        project-path: 'qubip-mqtt-client-mbedtls1v3'
+        project-target: 'qubip-mqtt-client-mbedtls1v3'
