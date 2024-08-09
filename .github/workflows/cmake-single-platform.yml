@@ -1,0 +1,27 @@
+name: STM32 Build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    # The CMake configure and build commands are platform agnostic and should work equally well on Windows or Mac.
+    # You can convert this to a matrix build if you need cross-platform coverage.
+    # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build with STM32CubeIDE action
+      uses: xanderhendriks/action-build-stm32cubeide@v13.0
+      with:
+        project-path: 'applications/sample_application/targets/STM32'
+        project-target: 'qubip-mqtt-client-mbedtls1v3/Debug'
