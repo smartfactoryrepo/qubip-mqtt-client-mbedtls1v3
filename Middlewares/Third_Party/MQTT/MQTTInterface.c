@@ -23,6 +23,7 @@
 #include "lwip.h"
 #include "lwip/api.h"
 #include "lwip/sockets.h"
+#include "leds.h"
 
 #ifdef MQTT_LWIP_SOCKET_TLS
 #include "mbedtls/net_sockets.h"
@@ -329,14 +330,7 @@ int ConnectNetwork(Network *n, char *ip, char * port) {
 			LOG_DEBUG("mbedtls_ssl_handshake failed.\n");
 			while(1)
 			{
-		    	HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_SET);
-		    	HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-		    	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
-		    	osDelay(125);
-		    	HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
-		    	HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-		    	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-		    	osDelay(125);
+				leds_indicate_tls_handshake_failure();
 			}
 			return -1;
 		}

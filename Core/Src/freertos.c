@@ -32,6 +32,7 @@
 #include "MQTTInterface.h"
 #include "rng.h"
 #include "platform.h"
+#include "leds.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -129,38 +130,26 @@ void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName)
   /* Run time stack overflow checking is performed if
    configCHECK_FOR_STACK_OVERFLOW is defined to 1 or 2. This hook function is
    called if a stack overflow is detected. */
-  HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET); //turn on red led when detects stack overflow
   LOG_DEBUG("\r\n!!! stack overflow detected in task: %s !!!\r\n", pcTaskName);
   size_t freeHeapSize = xPortGetFreeHeapSize();
   size_t minimumEverFreeHeapSize = xPortGetMinimumEverFreeHeapSize();
   LOG_DEBUG("freeHeapSize: %u bytes, minimumEverFreeHeapSize: %u bytes\r\n", (unsigned int)freeHeapSize, (unsigned int)minimumEverFreeHeapSize);
   while(1)
   {
-	  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
-	  HAL_Delay(125);
-	  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-	  HAL_Delay(125);
+	  leds_blink_on_stackoverflow();
   }
 }
 
 void vApplicationMallocFailedHook(void)
 {
 	// configUSE_MALLOC_FAILED_HOOK
-	HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
 	LOG_DEBUG("\r\n!!! Malloc Failed !!!\r\n");
 	size_t freeHeapSize = xPortGetFreeHeapSize();
 	size_t minimumEverFreeHeapSize = xPortGetMinimumEverFreeHeapSize();
 	LOG_DEBUG("freeHeapSize: %u bytes, minimumEverFreeHeapSize: %u bytes\r\n", (unsigned int)freeHeapSize, (unsigned int)minimumEverFreeHeapSize);
 	while(1)
 	{
-		HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
-		HAL_Delay(500);
-		HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-		HAL_Delay(500);
+		leds_flash_error_on_malloc_failure();
 	}
 }
 
@@ -310,6 +299,7 @@ void StartDefaultTask(void const * argument)
   /* init code for LWIP */
   MX_LWIP_Init();
   /* USER CODE BEGIN StartDefaultTask */
+  // Stack size calculated with static stack analyzer
   osThreadDef(mqttClientSubTask, MqttClientSubTask, osPriorityNormal, 0, (8.5 * 1024 ) / 4 ); //subscribe task
   osThreadDef(mqttClientPubTask, MqttClientPubTask, osPriorityNormal, 0, (8 * 1024) / 4 ); //publish task
   mqttClientSubTaskHandle = osThreadCreate(osThread(mqttClientSubTask), NULL);
@@ -327,51 +317,49 @@ void StartDefaultTask(void const * argument)
 /* USER CODE BEGIN Application */
 void MqttClientSubTask(void const *argument)
 {
-  while(1)
+  // Waiting for valid ip address
+  while (gnetif.ip_addr.addr == 0 || gnetif.netmask.addr == 0 || gnetif.gw.addr == 0)
   {
-    //waiting for valid ip address
-    if (gnetif.ip_addr.addr == 0 || gnetif.netmask.addr == 0 || gnetif.gw.addr == 0) //system has no valid ip address
-    {
+      // System has no valid ip address, wait for 1 second
       osDelay(1000);
-      continue;
-    }
-    else
-    {
-      LOG_DEBUG("DHCP/Static IP O.K.\n");
-      const uint32_t local_IP = gnetif.ip_addr.addr;
-      LOG_DEBUG("IP %lu.%lu.%lu.%lu\n\r",(local_IP & 0xff), ((local_IP >> 8) & 0xff), ((local_IP >> 16) & 0xff), (local_IP >> 24));
-      break;
-    }
   }
+
+  // IP address is valid, log the details
+  LOG_DEBUG("DHCP/Static IP O.K.\n");
+  const uint32_t local_IP = gnetif.ip_addr.addr;
+  LOG_DEBUG("IP %lu.%lu.%lu.%lu\n\r",(local_IP & 0xff), ((local_IP >> 8) & 0xff), ((local_IP >> 16) & 0xff), (local_IP >> 24));
+
 
   while(1)
   {
-    if(!mqttClient.isconnected)
-    {
-      //try to connect to the broker
-      MQTTDisconnect(&mqttClient);
-      MqttConnectBroker();
-      osDelay(1000);
-    }
-    else
-    {
+	  if(!mqttClient.isconnected)
+	  {
+		  //try to connect to the broker
+		  MQTTDisconnect(&mqttClient);
+		  MqttConnectBroker();
+		  osDelay(1000);
+		  continue;
+	  }
+
       MQTTYield(&mqttClient, 1000); //handle timer
       osDelay(100);
-    }
   }
 }
 
 void MqttClientPubTask(void const *argument)
 {
   char str[50];
-  //const char* str = "MQTT message from STM32";
   MQTTMessage message;
   uint32_t n = 0;
 
   while(1)
   {
-    if(mqttClient.isconnected)
-    {
+	  if(!mqttClient.isconnected)
+	  {
+		  leds_blink_while_mqtt_client_disconnected();
+		  continue;
+	  }
+
       ++n;
       snprintf(str, sizeof(str), "MQTT message from STM32: %lu", n);
       message.payload = (void*)str;
@@ -381,17 +369,13 @@ void MqttClientPubTask(void const *argument)
       {
         MQTTCloseSession(&mqttClient);
         net_disconnect(&net);
+        osDelay(1000);
+        continue;
       }
+
       LOG_DEBUG("[%lu] Ho inviato un messaggio!\n", n);
+      leds_blink_on_mqtt_message_sent();
       osDelay(1000);
-    }
-    else
-    {
-    	HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_SET);
-    	osDelay(250);
-    	HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
-    	osDelay(250);
-    }
   }
 }
 
@@ -452,13 +436,11 @@ int MqttConnectBroker()
 
 void MqttMessageArrived(MessageData* msg)
 {
-  HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin); //toggle pin when new message arrived
+	MQTTMessage* message = msg->message;
+	memset(msgBuffer, 0, sizeof(msgBuffer));
+	memcpy(msgBuffer, message->payload,message->payloadlen);
 
-  MQTTMessage* message = msg->message;
-  memset(msgBuffer, 0, sizeof(msgBuffer));
-  memcpy(msgBuffer, message->payload,message->payloadlen);
-
-  LOG_DEBUG("MQTT MSG[%d]:%s\n", (int)message->payloadlen, msgBuffer);
+	LOG_DEBUG("MQTT MSG[%d]:%s\n", (int)message->payloadlen, msgBuffer);
 }
 
 /* USER CODE END Application */

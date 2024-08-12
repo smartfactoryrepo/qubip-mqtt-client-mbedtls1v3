@@ -23,6 +23,7 @@
 #include "usart.h"
 #include "gpio.h"
 #include "rng.h"
+#include "leds.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
