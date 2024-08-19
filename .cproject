@@ -75,6 +75,7 @@
 									<listOptionValue builtIn="false" value="${workspace_loc:/${ProjName}/Middlewares/Third_Party/MQTT}"/>
 									<listOptionValue builtIn="false" value="${workspace_loc:/${ProjName}/Middlewares/Third_Party/MQTT/MQTTPacket}"/>
 									<listOptionValue builtIn="false" value="${workspace_loc:/${ProjName}/Drivers/CMSIS/Include}"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middlewares/Third_Party/MODBUS}&quot;"/>
 								</option>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.option.otherflags.1810376235" name="Other flags" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.option.otherflags" useByScannerDiscovery="true" valueType="stringList">
 									<listOptionValue builtIn="false" value="-fcommon"/>
@@ -182,6 +183,7 @@
 									<listOptionValue builtIn="false" value="${workspace_loc:/${ProjName}/Middlewares/Third_Party/MQTT}"/>
 									<listOptionValue builtIn="false" value="${workspace_loc:/${ProjName}/Middlewares/Third_Party/MQTT/MQTTPacket}"/>
 									<listOptionValue builtIn="false" value="${workspace_loc:/${ProjName}/Drivers/CMSIS/Include}"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/Middlewares/Third_Party/MODBUS}&quot;"/>
 								</option>
 								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.option.otherflags.113655758" name="Other flags" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.option.otherflags" useByScannerDiscovery="true" valueType="stringList">
 									<listOptionValue builtIn="false" value="-fcommon"/>

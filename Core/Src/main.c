@@ -65,7 +65,7 @@ int _write(int file, char *ptr, int len)
 
   HAL_UART_Transmit(&huart3, (uint8_t *) ptr, len, HAL_MAX_DELAY);
 
-  for (DataIdx = 0; DataIdx < len; DataIdx++)
+  for (DataIdx = 0; DataIdx < len; ++DataIdx)
   {
     ITM_SendChar(*ptr++);
   }
