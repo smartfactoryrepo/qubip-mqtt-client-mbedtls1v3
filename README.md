@@ -43,3 +43,7 @@ This code is provided under the [MIT License](LICENSE). Feel free to use and mod
 ## Contributing 🤝
 
 Contributions are welcome! Please submit a pull request or open an issue if you find any bugs or have suggestions for improvement. 🙏
+
+## Todo 🚧
+1. Add post-quantum secure element integration. 🛡️
+
