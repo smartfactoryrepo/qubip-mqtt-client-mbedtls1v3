@@ -1,11 +1,13 @@
 # MQTT Client Example with TLS 1.3 Encryption on NUCLEO-F429ZI
 
-This example demonstrates how to establish a secure connection to a MQTT broker using TLS v1.3 encryption on a NUCLEO-F429ZI board. It then sends a MQTT message every second.
+This example demonstrates how to establish a secure connection to a MQTT broker using TLS v1.3 encryption on a NUCLEO-F429ZI board.
+It subsequently establishes a Modbus TCP connection to a PLC, reads a holding register, and transmits its value to the MQTT broker. The register is then incremented by one, updated on the PLC, and this cycle repeats continuously.
 
 ## Features 🧰
 
 * Secure connection to mqtt broker using TLS v1.3. 🔐
 * Periodic MQTT message publishing (every second). ⏱️
+* Periodic Modbus TCP communication. 🔄
 * Utilizes NUCLEO-F429ZI board for implementation. 💻
 
 ## Requirements ✅
@@ -13,6 +15,7 @@ This example demonstrates how to establish a secure connection to a MQTT broker 
 * **NUCLEO-F429ZI board:** This example is specifically tailored for the NUCLEO-F429ZI development board. 
 * **IDE:** STM32CubeIDE 1.16.0 📥
 * **MQTT broker:** You'll need an MQTT broker that supports TLS 1.3 connections. 🧩
+* **PLC**  You'll need a PLC that support modbus tcp.
 
 ## How to Run 🚀
 
