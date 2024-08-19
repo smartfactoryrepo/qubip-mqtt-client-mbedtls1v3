@@ -33,27 +33,15 @@
 #include "rng.h"
 #include "platform.h"
 #include "leds.h"
+#include "nanomodbus_interface.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-#include "nanomodbus_interface.h"
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-// TLS V1.2
-#if defined(TLS_1V2) && !defined(TLS_1V3)
-#define MQTT_PORT		"1885"
-#endif
-// TLS V1.3
-#if !defined(TLS_1V2) && defined(TLS_1V3)
-#define MQTT_PORT		"1883"
-#endif
-
-#define BROKER_IP		"192.168.101.63"
-#define MQTT_BUFSIZE	1024
-
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -72,8 +60,6 @@ osThreadId mqttClientPubTaskHandle;  //mqtt client task handle
 #define MODBUS_CLIENT_TASK_STACK_SIZE (2 * 1024)
 static StackType_t modbusClientTask_stack[ MODBUS_CLIENT_TASK_STACK_SIZE / sizeof( StackType_t ) ];
 static StaticTask_t modbusClientTask_tcb;
-
-osMutexId lanMutex;
 
 
 Network mqttNet; //mqtt network
@@ -260,7 +246,8 @@ void my_free(void *ptr)
  * @param  None
  * @retval None
  */
-void MX_FREERTOS_Init(void) {
+void MX_FREERTOS_Init(void)
+{
   /* USER CODE BEGIN Init */
   /* Pass the array into vPortDefineHeapRegions(). */
   int ret = mbedtls_platform_set_calloc_free(my_calloc, my_free);
@@ -311,9 +298,6 @@ void StartDefaultTask(void const * argument)
   /* init code for LWIP */
   MX_LWIP_Init();
   /* USER CODE BEGIN StartDefaultTask */
-  // lanMutex
-  osMutexDef(LanMutex); // Definisci il mutex (opzionale, ma consigliato)
-  lanMutex = osMutexCreate(osMutex(LanMutex)); // Crea il mutex
 
   // Stack size calculated with static stack analyzer
   // Publish mqtt task
@@ -325,21 +309,12 @@ void StartDefaultTask(void const * argument)
   osThreadDef(mqttClientSubTask, MqttClientSubTask, osPriorityNormal, 0, (8.5 * 1024 ) / sizeof( StackType_t ) );
   mqttClientSubTaskHandle = osThreadCreate(osThread(mqttClientSubTask), NULL);
 
-  osDelay(5000);
 
+  // Wait the connection with the mqtt broker before attempt the PLC connection.
   if(!mqttClient.isconnected)
   {
 	  osDelay(250);
   }
-
-  /*
-  // Wait the connection with the PLC before attempt the mqtt broker connection.
-  if (osMutexWait(lanMutex, osWaitForever) != osOK)
-  {
-	   LOG_DEBUG("Error in the acquisition of the Modbus mutex\n");
-  }
-  LOG_DEBUG("lan mutex released!\n");
-  */
 
   // To add another task by dynamically allocating its stack, the heap space must be increased.
   // Or you statically allocate the stack.
@@ -366,9 +341,6 @@ void StartDefaultTask(void const * argument)
 }
 
 /* Private application code --------------------------------------------------*/
-
-#define MODBUS_PLC_REGISTER 32770
-
 /* USER CODE BEGIN Application */
 /* Definizione della funzione del task */
 void ModbusClientTask(void *argument)
@@ -392,9 +364,7 @@ void ModbusClientTask(void *argument)
 		}
 
 		// Dopo aver stabilito la connessione Modbus TCP con successo:
-		//osMutexRelease(lanMutex);
 		LOG_DEBUG("Connected to plc!\n");
-
 		nmbs_error err = NMBS_ERROR_NONE;
 
 		do
@@ -509,7 +479,6 @@ void MqttClientPubTask(void const *argument)
       LOG_DEBUG("[%lu] Ho inviato un messaggio!\n", ulNotifiedValue);
       leds_blink_on_mqtt_message_sent();
 
-      //osDelay(1000);
       vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
