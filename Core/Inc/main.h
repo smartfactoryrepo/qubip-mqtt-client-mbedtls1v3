@@ -95,8 +95,35 @@ void Error_Handler(void);
 #define LD2_Pin GPIO_PIN_7
 #define LD2_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
+
+// ----------------------------------------------------------------------------
+// MODBUS Configuration Defines
+// ----------------------------------------------------------------------------
+
+#define MOBBUS_PLC_IP 		"192.168.101.212"
+#define MODBUS_PLC_PORT 	"502"
+#define MODBUS_PLC_REGISTER 32770
+
+// ----------------------------------------------------------------------------
+// MQTT Configuration Defines
+// ----------------------------------------------------------------------------
+
 //#define TLS_1V2
 #define TLS_1V3
+
+#define BROKER_IP		"192.168.101.63"
+#define MQTT_BUFSIZE	1024
+
+// TLS V1.2
+#if defined(TLS_1V2) && !defined(TLS_1V3)
+#define MQTT_PORT		"1885"
+#endif
+// TLS V1.3
+#if !defined(TLS_1V2) && defined(TLS_1V3)
+#define MQTT_PORT		"1883"
+#endif
+
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

@@ -4,6 +4,7 @@
  *  Created on: Aug 13, 2024
  *      Author: federico
  */
+#include "main.h"
 #include "nanomodbus_interface.h"
 #include "nanomodbus.h"
 #include "lwip.h"
