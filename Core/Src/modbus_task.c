@@ -11,6 +11,7 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "limits.h"
+#include "lwip.h"
 
 #include "MQTTInterface.h"
 #include "leds.h"
@@ -24,6 +25,7 @@
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
+extern struct netif gnetif; //extern gnetif
 
 /* Private function prototypes -----------------------------------------------*/
 
@@ -41,6 +43,18 @@ void ModbusClientTask(void *argument)
 
 	for(;;)
 	{
+		// Is link up?
+		// Write once link is down
+		if(!netif_is_link_up(&gnetif))
+		{
+			LOG_DEBUG("Link is down\n");
+		}
+		while(!netif_is_link_up(&gnetif))
+		{
+			osDelay(250);
+		}
+		LOG_DEBUG("Link is up\n");
+
 		// Wait until connection with MQTT broker is established
 		while(!mqttClient.isconnected)
 		{

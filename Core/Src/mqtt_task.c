@@ -131,8 +131,6 @@ void MqttClientPubTask(void const *argument)
 		net_clear();
 		if(MqttConnectBroker() < 0)
 		{
-			net_disconnect(&mqttNet);
-			net_clear();
 			continue;
 		}
 
@@ -143,8 +141,6 @@ void MqttClientPubTask(void const *argument)
 		{
 			// Send a mqtt message
 			// Get the PLC holding register value from the other task
-			//ulNotifiedValue = ulTaskNotifyTake(pdTRUE, 500);
-			// portMAX_DELAY
 			if(xTaskNotifyWait(0, 0, &ulNotifiedValue, 250) != pdTRUE)
 			{
 				osDelay(250);
@@ -188,6 +184,7 @@ void ethernet_status_updated(struct netif *netif)
 {
 	// Force a reconnect
 	need_to_reconnect = 1;
+	LOG_DEBUG("Force a reconnect!\n");
 }
 
 
