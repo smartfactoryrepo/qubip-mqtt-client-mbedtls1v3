@@ -26,6 +26,9 @@
 #ifndef __MQTT_INTERFACE_H_
 #define __MQTT_INTERFACE_H_
 
+#include "cmsis_os.h"
+
+
 #define MQTT_LWIP_SOCKET_TLS  //Use SOCKET API WITH TLS
 //#define MQTT_LWIP_SOCKET	//Use SOCKET API
 //#define MQTT_LWIP_NETCONN //Use NETCONN API
@@ -71,6 +74,23 @@ int  ConnectNetwork(Network*, char*, char*);
 #endif
 #ifdef MQTT_LWIP_SOCKET
 int  ConnectNetwork(Network*, char*, int);
+#endif
+
+#ifdef MQTT_TASK
+typedef struct Mutex
+{
+	SemaphoreHandle_t sem;
+} Mutex;
+
+void MutexInit(Mutex*);
+int MutexLock(Mutex*);
+int MutexUnlock(Mutex*);
+
+typedef struct Thread
+{
+	TaskHandle_t task;
+} Thread;
+int ThreadStart(Thread* thread, void (*fn)(void*), void* arg);
 #endif
 
 #endif

@@ -34,6 +34,10 @@
   #define DLLExport
 #endif
 
+
+//#define MQTT_TASK 1
+
+
 #include <MQTTPacket.h>
 #include <MQTTInterface.h>
 

@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "tim.h"
 #include "cmsis_os.h"
 #include "lwip.h"
 #include "usart.h"
@@ -188,14 +189,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   /* USER CODE BEGIN Callback 0 */
 
   /* USER CODE END Callback 0 */
-  if (htim->Instance == TIM6) {
+  if (htim->Instance == TIM6)
+  {
     HAL_IncTick();
+    ++MilliTimer;
   }
   /* USER CODE BEGIN Callback 1 */
-  if (htim->Instance == TIM6) {
-    MilliTimer++;
-  }
-
   /* USER CODE END Callback 1 */
 }
 

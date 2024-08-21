@@ -34,6 +34,9 @@
 #include "platform.h"
 #include "leds.h"
 #include "nanomodbus_interface.h"
+#include "iperf_server.h"
+#include "mqtt_task.h"
+#include "modbus_task.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -42,6 +45,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define MODBUS_CLIENT_TASK_STACK_SIZE (2 * 1024)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -52,25 +56,10 @@
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
 extern struct netif gnetif; //extern gnetif
-
-osThreadId mqttClientSubTaskHandle;  //mqtt client task handle
-osThreadId mqttClientPubTaskHandle;  //mqtt client task handle
-
-/* Stack e controllo del task staticamente allocati */
-#define MODBUS_CLIENT_TASK_STACK_SIZE (2 * 1024)
+/* Stack task size*/
 static StackType_t modbusClientTask_stack[ MODBUS_CLIENT_TASK_STACK_SIZE / sizeof( StackType_t ) ];
+/* Task Control Block */
 static StaticTask_t modbusClientTask_tcb;
-
-
-Network mqttNet; //mqtt network
-Network modbusNet; // modbus network
-
-MQTTClient mqttClient; //mqtt client
-
-uint8_t sndBuffer[MQTT_BUFSIZE]; //mqtt send buffer
-uint8_t rcvBuffer[MQTT_BUFSIZE]; //mqtt receive buffer
-uint8_t msgBuffer[MQTT_BUFSIZE]; //mqtt message buffer
-
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
 
@@ -100,12 +89,6 @@ const HeapRegion_t xHeapRegions[] =
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
-void MqttClientSubTask(void const *argument); 	// mqtt client subscribe task function
-void MqttClientPubTask(void const *argument); 	// mqtt client publish task function
-int  MqttConnectBroker(void); 					// mqtt broker connect function
-void MqttMessageArrived(MessageData *msg); 		// mqtt message callback function
-void ModbusClientTask(void *argument);    		// modbus client task function
-
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void const * argument);
@@ -277,7 +260,7 @@ void MX_FREERTOS_Init(void)
 
   /* Create the thread(s) */
   /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 512);
+  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 512 );
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -299,14 +282,20 @@ void StartDefaultTask(void const * argument)
   MX_LWIP_Init();
   /* USER CODE BEGIN StartDefaultTask */
 
+#ifdef IPERF_SERVER_ENABLED
+  LOG_DEBUG("IPERF server enabled\n");
+  iperf_server_init();
+#endif
+
+
   // Stack size calculated with static stack analyzer
   // Publish mqtt task
-  osThreadDef(mqttClientPubTask, MqttClientPubTask, osPriorityNormal, 0, (8 * 1024) / sizeof( StackType_t ) );
+  osThreadDef(mqttClientPubTask, MqttClientPubTask, osPriorityNormal, 0, (8.5 * 1024) / sizeof( StackType_t ) );
   mqttClientPubTaskHandle = osThreadCreate(osThread(mqttClientPubTask), NULL);
 
   // Stack size calculated with static stack analyzer
   // Subscribe mqtt task
-  osThreadDef(mqttClientSubTask, MqttClientSubTask, osPriorityNormal, 0, (8.5 * 1024 ) / sizeof( StackType_t ) );
+  osThreadDef(mqttClientSubTask, MqttClientSubTask, osPriorityNormal, 0, (8 * 1024 ) / sizeof( StackType_t ) );
   mqttClientSubTaskHandle = osThreadCreate(osThread(mqttClientSubTask), NULL);
 
 
@@ -331,220 +320,23 @@ void StartDefaultTask(void const * argument)
           &modbusClientTask_tcb );  	/* Variable to hold the task's data structure. */
 
 
-
   /* Infinite loop */
   for(;;)
   {
-    osDelay(100);
+//	  MQTTDisconnect(&mqttClient);
+//	  net_disconnect(&mqttNet);
+//	  net_clear();
+//	  MqttConnectBroker();
+//
+	  osDelay(1000);
   }
   /* USER CODE END StartDefaultTask */
 }
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
-/* Definizione della funzione del task */
-void ModbusClientTask(void *argument)
-{
-	int fd = -1;
-	nmbs_t nmbs;
-
-	while(1)
-	{
-		while(!mqttClient.isconnected)
-		{
-			osDelay(250);
-		}
-
-		if(nmbs_platform_setup(&fd, &nmbs) == -1)
-		{
-			// Error
-			LOG_DEBUG("I'll try again in 1 second \n");
-			osDelay(1000);
-			continue;
-		}
-
-		// Dopo aver stabilito la connessione Modbus TCP con successo:
-		LOG_DEBUG("Connected to plc!\n");
-		nmbs_error err = NMBS_ERROR_NONE;
-
-		do
-		{
-		    // Read holding registers
-		    uint16_t r_regs[1] = { 0 };
-		    err = nmbs_read_holding_registers(&nmbs, MODBUS_PLC_REGISTER, 1, r_regs);
-		    if (err != NMBS_ERROR_NONE)
-		    {
-		        LOG_DEBUG("Error reading holding register at address %d - %s\n", MODBUS_PLC_REGISTER, nmbs_strerror(err));
-		        if (!nmbs_error_is_exception(err))
-		        {
-		        	LOG_DEBUG("Exception occurred in nmbs_read_holding_registers\n");
-		        	continue;
-		        }
-		    }
-		    else
-		    {
-		    	LOG_DEBUG("Register at address %d: %d\n", MODBUS_PLC_REGISTER, r_regs[0]);
-		    }
-
-		    // Send the new received data to the mqtt publisher task
-		    xTaskNotify(mqttClientPubTaskHandle, r_regs[0], eSetValueWithOverwrite);
-
-		    // Write holding register. Cycle from 0 to 255.
-		    uint16_t w_regs[1] = { (r_regs[0] >= 255) ? 0 : ++r_regs[0] };
-		    err = nmbs_write_multiple_registers(&nmbs, MODBUS_PLC_REGISTER, 1, w_regs);
-		    if (err != NMBS_ERROR_NONE)
-		    {
-		    	LOG_DEBUG("Error writing register at address %d - %s", MODBUS_PLC_REGISTER, nmbs_strerror(err));
-		        if (!nmbs_error_is_exception(err))
-		        {
-		        	LOG_DEBUG("Exception occurred in nmbs_write_multiple_registers\n");
-		        	continue;
-		        }
-		    }
-
-			osDelay(1000);
-		}while(err == NMBS_ERROR_NONE && mqttClient.isconnected);
-	}
-}
 
 
 
-void MqttClientSubTask(void const *argument)
-{
-	// Waiting for valid ip address
-	LOG_DEBUG("Waiting for valid ip address\n");
-	while (gnetif.ip_addr.addr == 0 || gnetif.netmask.addr == 0 || gnetif.gw.addr == 0)
-	{
-	    // System has no valid ip address, wait for 1/2 second
-	    osDelay(500);
-	}
-
-	// IP address is valid, log the details
-	LOG_DEBUG("DHCP/Static IP O.K.\n");
-	const uint32_t local_IP = gnetif.ip_addr.addr;
-	LOG_DEBUG("IP %lu.%lu.%lu.%lu\n\r",(local_IP & 0xff), ((local_IP >> 8) & 0xff), ((local_IP >> 16) & 0xff), (local_IP >> 24));
-
-	while(1)
-	{
-		if(!mqttClient.isconnected)
-		{
-			// Try to connect to the broker
-			MQTTDisconnect(&mqttClient);
-			MqttConnectBroker();
-			osDelay(1000);
-			continue;
-		}
-
-		MQTTYield(&mqttClient, 1000); // Handle timer
-		osDelay(100);
-	}
-}
-
-void MqttClientPubTask(void const *argument)
-{
-  char str[50];
-  MQTTMessage message;
-
-  uint32_t ulNotifiedValue = 0;
-  TickType_t xLastWakeTime = xTaskGetTickCount();
-  const TickType_t xFrequency = 1000;
-
-  while(1)
-  {
-	  if(!mqttClient.isconnected)
-	  {
-		  leds_blink_while_mqtt_client_disconnected();
-		  continue;
-	  }
-
-	  ulNotifiedValue = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-
-      /*if(xTaskNotifyWait(0, 0, &ulNotifiedValue, portMAX_DELAY) != pdTRUE)
-      {
-    	  LOG_DEBUG("Error in xTaskNotifyWait\n");
-      }*/
-
-      snprintf(str, sizeof(str), "MQTT message from STM32: %lu", ulNotifiedValue);
-      message.payload = (void*)str;
-      message.payloadlen = strlen(str);
-
-      if(MQTTPublish(&mqttClient, "2023/test", &message) != MQTT_SUCCESS)
-      {
-        MQTTCloseSession(&mqttClient);
-        net_disconnect(&mqttNet);
-        osDelay(1000);
-        continue;
-      }
-
-      LOG_DEBUG("[%lu] Ho inviato un messaggio!\n", ulNotifiedValue);
-      leds_blink_on_mqtt_message_sent();
-
-      vTaskDelayUntil(&xLastWakeTime, xFrequency);
-  }
-}
-
-int MqttConnectBroker()
-{
-  int ret;
-
-  NewNetwork(&mqttNet);
-  net_clear();
-  ret = ConnectNetwork(&mqttNet, BROKER_IP, MQTT_PORT);
-
-  size_t freeHeapSize = xPortGetFreeHeapSize();
-  size_t minimumEverFreeHeapSize = xPortGetMinimumEverFreeHeapSize();
-  LOG_DEBUG("freeHeapSize: %u bytes, minimumEverFreeHeapSize: %u bytes\r\n", (unsigned int)freeHeapSize, (unsigned int)minimumEverFreeHeapSize);
-
-  HeapStats_t pxHeapStats;
-  vPortGetHeapStats( &pxHeapStats );
-
-  if(ret != MQTT_SUCCESS)
-  {
-    LOG_DEBUG("\r\nConnectNetwork failed.\r\n");
-    net_disconnect(&mqttNet);
-    return -1;
-  }
-
-  MQTTClientInit(&mqttClient, &mqttNet, 1000, sndBuffer, sizeof(sndBuffer), rcvBuffer, sizeof(rcvBuffer));
-
-  MQTTPacket_connectData data = MQTTPacket_connectData_initializer;
-  data.willFlag = 0;
-  data.MQTTVersion = 3;
-  data.clientID.cstring = "STM32F4-cazzuta";
-  //data.username.cstring = "roger";
-  //data.password.cstring = "password";
-  data.keepAliveInterval = 60;
-  data.cleansession = 1;
-
-  ret = MQTTConnect(&mqttClient, &data);
-  if(ret != MQTT_SUCCESS)
-  {
-    LOG_DEBUG("MQTTConnect failed.\n");
-    MQTTCloseSession(&mqttClient);
-    net_disconnect(&mqttNet);
-    return ret;
-  }
-
-  ret = MQTTSubscribe(&mqttClient, "2023/test", QOS0, MqttMessageArrived);
-  if(ret != MQTT_SUCCESS)
-  {
-    LOG_DEBUG("MQTTSubscribe failed.\n");
-    MQTTCloseSession(&mqttClient);
-    net_disconnect(&mqttNet);
-    return ret;
-  }
-
-  LOG_DEBUG("MQTT_ConnectBroker O.K.\n");
-  return MQTT_SUCCESS;
-}
-
-void MqttMessageArrived(MessageData* msg)
-{
-	MQTTMessage* message = msg->message;
-	memset(msgBuffer, 0, sizeof(msgBuffer));
-	memcpy(msgBuffer, message->payload,message->payloadlen);
-
-	LOG_DEBUG("MQTT MSG[%d]:%s\n", (int)message->payloadlen, msgBuffer);
-}
 
 /* USER CODE END Application */

@@ -32,6 +32,7 @@
 /* USER CODE END 0 */
 /* Private function prototypes -----------------------------------------------*/
 static void ethernet_link_status_updated(struct netif *netif);
+__weak void ethernet_status_updated(struct netif *netif);
 /* ETH Variables initialization ----------------------------------------------*/
 void Error_Handler(void);
 
@@ -93,20 +94,27 @@ void MX_LWIP_Init(void)
 
   /* Registers the default network interface */
   netif_set_default(&gnetif);
+  /* Bring an interface up */
+  netif_set_up(&gnetif);
 
-  if (netif_is_link_up(&gnetif))
-  {
-    /* When the netif is fully configured this function must be called */
-    netif_set_up(&gnetif);
-  }
-  else
-  {
-    /* When the netif link is down this function must be called */
-    netif_set_down(&gnetif);
-  }
+//  START Total STM32CubeMX nonsense. Is already handled in ethernet_link_thread
+//  if (netif_is_link_up(&gnetif))
+//  {
+//    /* When the netif is fully configured this function must be called */
+//    //netif_set_up(&gnetif);
+//  }
+//  else
+//  {
+//    /* When the netif link is down this function must be called */
+//    //netif_set_down(&gnetif);
+//  }
+//  END Total nonsense:
 
   /* Set the link callback function, this function is called on change of link status*/
   netif_set_link_callback(&gnetif, ethernet_link_status_updated);
+
+  /* Called when interface is brought up/down or address is changed while up */
+  netif_set_status_callback(&gnetif, ethernet_status_updated);
 
   /* Create the Ethernet link handler thread */
   /* USER CODE BEGIN H7_OS_THREAD_DEF_CREATE_CMSIS_RTOS_V1 */
@@ -134,22 +142,33 @@ void MX_LWIP_Init(void)
  */
 static void ethernet_link_status_updated(struct netif *netif)
 {
-  if (netif_is_up(netif))
-  {
-    /* USER CODE BEGIN 5 */
-    HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_SET);
-    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-    LOG_DEBUG("Connected\n");
-    /* USER CODE END 5 */
-  }
-  else /* netif is down */
-  {
-    /* USER CODE BEGIN 6 */
-    HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
-    LOG_DEBUG("Disconnected\n");
-    /* USER CODE END 6 */
-  }
+	if (netif_is_up(netif))
+	{
+		/* USER CODE BEGIN 5 */
+		HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+		LOG_DEBUG("Ethernet link up\n");
+		/* USER CODE END 5 */
+	}
+	else /* netif is down */
+	{
+		/* USER CODE BEGIN 6 */
+		HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
+		LOG_DEBUG("Ethernet link down\n");
+		/* USER CODE END 6 */
+	}
+}
+
+
+/**
+ * @brief  Called when interface is brought up/down or address is changed while up
+ * @param  netif: the network interface
+ * @retval None
+ */
+__weak void ethernet_status_updated(struct netif *netif)
+{
+
 }
 
 #if defined ( __CC_ARM )  /* MDK ARM Compiler */

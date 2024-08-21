@@ -341,7 +341,6 @@ int ConnectNetwork(Network *n, char *ip, char * port) {
 		LOG_DEBUG("mbedtls_ssl_get_verify_result failed.\n");
 		return -1;
 	}
-	LOG_DEBUG("net_connect OK.\n");
 
 	return 0;
 }
@@ -407,6 +406,8 @@ void net_disconnect(Network *n) {
 void net_clear() {
 	mbedtls_net_free(&server_fd);
 	mbedtls_x509_crt_free(&cacert);
+	mbedtls_x509_crt_init(&clicert);
+	mbedtls_pk_init(&pkey);
 	mbedtls_ssl_free(&ssl);
 	mbedtls_ssl_config_free(&conf);
 	mbedtls_ctr_drbg_free(&ctr_drbg);
@@ -497,6 +498,39 @@ void net_disconnect(Network *n) {
 }
 #endif
 
+#ifdef MQTT_TASK
+int ThreadStart(Thread* thread, void (*fn)(void*), void* arg)
+{
+	int rc = 0;
+	uint16_t usTaskStackSize = (configMINIMAL_STACK_SIZE * 5);
+	UBaseType_t uxTaskPriority = uxTaskPriorityGet(NULL); /* set the priority as the same as the calling task*/
+
+	rc = xTaskCreate(fn,	/* The function that implements the task. */
+		"MQTTTask",			/* Just a text name for the task to aid debugging. */
+		usTaskStackSize,	/* The stack size is defined in FreeRTOSIPConfig.h. */
+		arg,				/* The task parameter, not used in this case. */
+		uxTaskPriority,		/* The priority assigned to the task is defined in FreeRTOSConfig.h. */
+		&thread->task);		/* The task handle is not used. */
+
+	return rc;
+}
+
+
+void MutexInit(Mutex* mutex)
+{
+	mutex->sem = xSemaphoreCreateMutex();
+}
+
+int MutexLock(Mutex* mutex)
+{
+	return xSemaphoreTake(mutex->sem, portMAX_DELAY);
+}
+
+int MutexUnlock(Mutex* mutex)
+{
+	return xSemaphoreGive(mutex->sem);
+}
+#endif
 
 //Timer functions
 char TimerIsExpired(Timer *timer) {

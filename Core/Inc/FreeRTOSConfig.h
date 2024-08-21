@@ -45,6 +45,9 @@
 
 /* USER CODE BEGIN Includes */
 /* Section where include file can be added */
+#include "stm32f4xx_hal.h"
+#include "tim.h"
+extern TIM_HandleTypeDef htim7;
 /* USER CODE END Includes */
 
 /* Ensure definitions are only used by the compiler, and not by the assembler. */
@@ -75,6 +78,14 @@
 #define configUSE_PORT_OPTIMISED_TASK_SELECTION  1
 #define configUSE_MALLOC_FAILED_HOOK             1
 #define configENABLE_HEAP_PROTECTOR              1
+
+#ifdef DEBUG
+#define configUSE_TRACE_FACILITY                 1 	// 1: include additional structure members and functions to assist with execution visualization and tracing, 0: no runtime stats/trace
+#ifndef configRECORD_STACK_HIGH_ADDRESS
+#define configRECORD_STACK_HIGH_ADDRESS			 1
+#endif
+#endif
+
 /* USER CODE BEGIN MESSAGE_BUFFER_LENGTH_TYPE */
 /* Defaults to size_t for backward compatibility, but can be changed
    if lengths will always be less than the number of bytes in a size_t. */
