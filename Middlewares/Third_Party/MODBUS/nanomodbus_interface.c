@@ -17,20 +17,27 @@
 #include "cmsis_os.h"
 
 
+/**
+ * Initializes the Modbus platform, establishing a connection to the server
+ * and creating the Modbus client.
+ *
+ * @param[out] fd Pointer to a file descriptor to store the connection handle.
+ *
+ * @return 0 on success, -1 on failure.
+ */
 int8_t nmbs_platform_setup(int* fd, nmbs_t *nmbs)
 {
 	if(*fd >= 0)
 	{
-		nmbs_platform_disconnect(*fd);
+		nmbs_platform_disconnect(fd);
 	}
 
-	// Mi devo connettere
-	LOG_DEBUG("Connect to modbus server (PLC)\n");
+	// Connect
 	*fd = nmbs_platform_connect_tcp(MOBBUS_PLC_IP, MODBUS_PLC_PORT);
 	if(*fd < 0)
 	{
-		// Non sono connesso c'è un errore
-		LOG_DEBUG("Error while connecting to plc\n");
+		// Connection error
+		NANOMODBUS_INTERFACE_DEBUG_LOG("[NANOMODBUS_INTERFACE] ERROR: Error while connecting to plc\n");
 		return -1;
 	}
 
@@ -44,11 +51,11 @@ int8_t nmbs_platform_setup(int* fd, nmbs_t *nmbs)
 	nmbs_error err = nmbs_client_create(nmbs, &platform_conf);
 	if (err != NMBS_ERROR_NONE)
 	{
-		LOG_DEBUG("Error creating modbus client\n");
+		NANOMODBUS_INTERFACE_DEBUG_LOG("[NANOMODBUS_INTERFACE] ERROR: Error creating modbus client\n");
 	    if (!nmbs_error_is_exception(err))
 	    {
-	    	LOG_DEBUG("Exception occurred in nmbs_client_create\n");
-	    	nmbs_platform_disconnect(*fd);
+	    	NANOMODBUS_INTERFACE_DEBUG_LOG("[NANOMODBUS_INTERFACE] ERROR: Exception occurred in nmbs_client_create\n");
+	    	nmbs_platform_disconnect(fd);
 	    }
 	    return -1;
 	}
@@ -60,7 +67,15 @@ int8_t nmbs_platform_setup(int* fd, nmbs_t *nmbs)
 	return 0;
 }
 
-
+/**
+ * Establishes a TCP connection to a specified IP address and port.
+ *
+ * @param[in] host The IP address of the remote host to connect to (e.g., "192.168.1.100").
+ * @param[in] port The port number on the remote host to connect to (e.g., "502").
+ *
+ * @return A file descriptor representing the established connection if successful.
+ *         Returns -1 if the connection fails.
+ */
 int32_t nmbs_platform_connect_tcp(const char *host, const char *port)
 {
 	int ret = -1;
@@ -77,7 +92,8 @@ int32_t nmbs_platform_connect_tcp(const char *host, const char *port)
 
 	if( getaddrinfo( host, port, &hints, &addr_list ) != 0 )
 	{
-		LOG_DEBUG("Error in getaddrinfo\n");
+		NANOMODBUS_INTERFACE_DEBUG_LOG("[NANOMODBUS_INTERFACE] ERROR: Error in getaddrinfo\n");
+		freeaddrinfo(addr_list);
 		return -1;
 	}
 
@@ -87,7 +103,7 @@ int32_t nmbs_platform_connect_tcp(const char *host, const char *port)
 		fd = socket( cur->ai_family, cur->ai_socktype, cur->ai_protocol );
 	    if(fd < 0)
 	    {
-	    	LOG_DEBUG("Error net socket failed\n");
+	    	NANOMODBUS_INTERFACE_DEBUG_LOG("[NANOMODBUS_INTERFACE] ERROR: Error net socket failed\n");
 	    	ret = -1;
 	    	continue;
 	    }
@@ -98,9 +114,9 @@ int32_t nmbs_platform_connect_tcp(const char *host, const char *port)
 	    	break;
 	    }
 
-	    nmbs_platform_disconnect(fd);
+	    nmbs_platform_disconnect(&fd);
 
-	    LOG_DEBUG("Error net connect failed\n");
+	    NANOMODBUS_INTERFACE_DEBUG_LOG("[NANOMODBUS_INTERFACE] ERROR: Error net connect failed\n");
 	    ret = -1;
 	}
 
@@ -109,7 +125,16 @@ int32_t nmbs_platform_connect_tcp(const char *host, const char *port)
 	return (ret == -1) ? ret : fd;
 }
 
-
+/**
+ * Sends data over the established Modbus connection.
+ *
+ * @param[in] buf Pointer to the buffer containing data to send.
+ * @param[in] len Length of the data in the buffer.
+ * @param[in] timeout_ms Timeout in milliseconds for the send operation.
+ * @param[in] arg Optional argument for platform-specific use.
+ *
+ * @return The number of bytes sent on success, -1 on failure.
+ */
 int32_t nmbs_platform_send(const uint8_t* buf, uint16_t len, int32_t timeout_ms, void* arg )
 {
   int fd = *(int*) arg;
@@ -117,7 +142,7 @@ int32_t nmbs_platform_send(const uint8_t* buf, uint16_t len, int32_t timeout_ms,
 
   if( fd < 0 )
   {
-	  LOG_DEBUG("Error write, net invalid context\n");
+	  NANOMODBUS_INTERFACE_DEBUG_LOG("[NANOMODBUS_INTERFACE] ERROR: Error write, net invalid context\n");
 	  return -1;
   }
 
@@ -127,23 +152,33 @@ int32_t nmbs_platform_send(const uint8_t* buf, uint16_t len, int32_t timeout_ms,
   {
 	  if( errno == EPIPE || errno == ECONNRESET )
 	  {
-		  LOG_DEBUG("Error write, net conn reset or broken pipe\n");
+		  NANOMODBUS_INTERFACE_DEBUG_LOG("[NANOMODBUS_INTERFACE] ERROR: Error write, net conn reset or broken pipe\n");
 		  return -1;
 	  }
 
 	  if( errno == EINTR )
 	  {
-		  LOG_DEBUG("Error write, Interrupted system call\n");
+		  NANOMODBUS_INTERFACE_DEBUG_LOG("[NANOMODBUS_INTERFACE] ERROR: Error write, Interrupted system call\n");
 		  return -1;
 	  }
 
-	  LOG_DEBUG("Error write, net send failed\n");
+	  NANOMODBUS_INTERFACE_DEBUG_LOG("[NANOMODBUS_INTERFACE] ERROR: Error write, net send failed\n");
 	  return -1;
   }
 
   return ret;
 }
 
+/**
+ * Reads data from the established Modbus connection.
+ *
+ * @param[out] buf Pointer to the buffer to store the received data.
+ * @param[in] count Maximum number of bytes to read.
+ * @param[in] timeout_ms Timeout in milliseconds for the read operation. Not used
+ * @param[in] arg Optional argument for platform-specific use.
+ *
+ * @return The number of bytes read on success, -1 on failure.
+ */
 int32_t nmbs_platform_read(uint8_t* buf, uint16_t count, int32_t timeout_ms, void* arg)
 {
     int ret = 0;
@@ -151,7 +186,7 @@ int32_t nmbs_platform_read(uint8_t* buf, uint16_t count, int32_t timeout_ms, voi
 
     if( fd < 0 )
     {
-    	LOG_DEBUG("Error read, net invalid context\n");
+    	NANOMODBUS_INTERFACE_DEBUG_LOG("[NANOMODBUS_INTERFACE] ERROR: Error read, net invalid context\n");
     	return -1;
     }
 
@@ -161,23 +196,33 @@ int32_t nmbs_platform_read(uint8_t* buf, uint16_t count, int32_t timeout_ms, voi
     {
         if( errno == EPIPE || errno == ECONNRESET )
         {
-        	LOG_DEBUG("Error read, net conn reset or broken pipe\n");
+        	NANOMODBUS_INTERFACE_DEBUG_LOG("[NANOMODBUS_INTERFACE] ERROR: Error read, net conn reset or broken pipe\n");
         	return -1;
         }
 
         if( errno == EINTR )
         {
-        	LOG_DEBUG("Error read, Interrupted system call \n");
+        	NANOMODBUS_INTERFACE_DEBUG_LOG("[NANOMODBUS_INTERFACE] ERROR: Error read, Interrupted system call \n");
         	return -1;
         }
 
-        LOG_DEBUG("Error write, net send failed\n");
+        NANOMODBUS_INTERFACE_DEBUG_LOG("[NANOMODBUS_INTERFACE] ERROR: Error write, net send failed\n");
         return -1;
   }
 
   return ret;
 }
 
+/**
+ * Reads data from the established Modbus connection with a timeout.
+ *
+ * @param[out] buf Pointer to the buffer to store the received data.
+ * @param[in] count Maximum number of bytes to read.
+ * @param[in] timeout_ms Timeout in milliseconds for the read operation.
+ * @param[in] arg Optional argument for platform-specific use.
+ *
+ * @return The number of bytes read on success, -1 on failure.
+ */
 int32_t nmbs_platform_read_timeout(uint8_t* buf, uint16_t count, int32_t timeout_ms, void* arg)
 {
     int ret = 0;
@@ -185,7 +230,7 @@ int32_t nmbs_platform_read_timeout(uint8_t* buf, uint16_t count, int32_t timeout
 
     if( fd < 0 )
     {
-        LOG_DEBUG("Error read, net invalid context\n");
+        NANOMODBUS_INTERFACE_DEBUG_LOG("[NANOMODBUS_INTERFACE] ERROR: Error read, net invalid context\n");
         return -1;
     }
 
@@ -201,34 +246,34 @@ int32_t nmbs_platform_read_timeout(uint8_t* buf, uint16_t count, int32_t timeout
 
     if (ret == -1)
     {
-        LOG_DEBUG("Error select\n");
+        NANOMODBUS_INTERFACE_DEBUG_LOG("[NANOMODBUS_INTERFACE] ERROR: Error select\n");
         return -1;
     }
     else if (ret == 0)
     {
-        //LOG_DEBUG("Timeout read\n");
+        //NANOMODBUS_INTERFACE_DEBUG_LOG("[NANOMODBUS_INTERFACE] ERROR: Timeout read\n");
         return 0; // Timeout
     }
     else
     {
-        // Dati disponibili per la lettura
+    	// Data available for reading
         ret = read( fd, buf, count );
 
         if( ret < 0 )
         {
             if( errno == EPIPE || errno == ECONNRESET )
             {
-                LOG_DEBUG("Error read, net conn reset or broken pipe\n");
+                NANOMODBUS_INTERFACE_DEBUG_LOG("[NANOMODBUS_INTERFACE] ERROR: Error read, net conn reset or broken pipe\n");
                 return -1;
             }
 
             if( errno == EINTR )
             {
-                LOG_DEBUG("Error read, Interrupted system call \n");
+                NANOMODBUS_INTERFACE_DEBUG_LOG("[NANOMODBUS_INTERFACE] ERROR: Error read, Interrupted system call \n");
                 return -1;
             }
 
-            LOG_DEBUG("Error write, net send failed\n");
+            NANOMODBUS_INTERFACE_DEBUG_LOG("[NANOMODBUS_INTERFACE] ERROR: Error write, net send failed\n");
             return -1;
         }
     }
@@ -236,14 +281,13 @@ int32_t nmbs_platform_read_timeout(uint8_t* buf, uint16_t count, int32_t timeout
     return ret;
 }
 
-
-void nmbs_platform_disconnect(int fd)
+/**
+ * Disconnects from the Modbus server, closing the connection.
+ *
+ * @param[in] fd Pointerto File descriptor representing the connection to close.
+ */
+void nmbs_platform_disconnect(int *fd)
 {
-    close(fd);
-    printf("Closed connection %d\n", fd);
+    close(*fd);
+    NANOMODBUS_INTERFACE_DEBUG_LOG("[NANOMODBUS_INTERFACE] INFO: Closed connection %d\n", *fd);
 }
-
-
-
-
-

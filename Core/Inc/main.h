@@ -48,9 +48,13 @@ extern "C" {
 /* USER CODE BEGIN EM */
 #ifdef DEBUG
 #include <stdarg.h>
-#define LOG_DEBUG(message, ...) do { printf(message, ##__VA_ARGS__); } while(0)
+//#define DEBUG_LOG(message, ...) do { printf(message, ##__VA_ARGS__); } while(0)
+#define DEBUG_LOG(message, ...) do { \
+	printf("%lu -> ", HAL_GetTick()); \
+    printf(message, ##__VA_ARGS__); \
+} while(0)
 #else
-#define LOG_DEBUG(message, ...)
+#define DEBUG_LOG(message, ...)
 #endif
 /* USER CODE END EM */
 
@@ -124,7 +128,25 @@ void Error_Handler(void);
 #endif
 
 
+// ----------------------------------------------------------------------------
+// IPERF Configuration Defines
+// ----------------------------------------------------------------------------
 #define IPERF_SERVER_ENABLED
+
+
+
+// ----------------------------------------------------------------------------
+// DEBUG Configuration Defines
+// ----------------------------------------------------------------------------
+// Comment to disable debug messages
+
+#define MODBUS_TASK_DEBUG
+#define MQTT_SUB_TASK_DEBUG
+#define MQTT_PUB_TASK_DEBUG
+#define FREERTOS_DEBUG
+#define LWIP_EVENT_DEBUG
+#define NANOMODBUS_INTERFACE_DEBUG
+#define MQTT_INTERFACE_DEBUG
 
 /* USER CODE END Private defines */
 

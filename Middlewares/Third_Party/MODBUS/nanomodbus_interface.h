@@ -7,9 +7,20 @@
 
 #ifndef __NANOMODBUS_INTERFACE_H__
 #define __NANOMODBUS_INTERFACE_H__
-
+/* Private includes ----------------------------------------------------------*/
 #include <stdint.h>
 #include "nanomodbus.h"
+
+
+/* Private define ------------------------------------------------------------*/
+#if defined NANOMODBUS_INTERFACE_DEBUG
+#define NANOMODBUS_INTERFACE_DEBUG_LOG(message, ...) DEBUG_LOG(message, ##__VA_ARGS__)
+#else
+#define NANOMODBUS_INTERFACE_DEBUG_LOG(message, ...)
+#endif
+
+
+/* Private function prototypes -----------------------------------------------*/
 
 // ----------------------------------------------------------------------------
 // Platform-Specific Communication Functions
@@ -39,9 +50,9 @@ int32_t nmbs_platform_connect_tcp(const char *host, const char *port);
 /**
  * Disconnects from the Modbus server, closing the connection.
  *
- * @param[in] fd File descriptor representing the connection to close.
+ * @param[in] fd Pointerto File descriptor representing the connection to close.
  */
-void nmbs_platform_disconnect(int fd);
+void nmbs_platform_disconnect(int *fd);
 
 /**
  * Sends data over the established Modbus connection.
@@ -60,13 +71,23 @@ int32_t nmbs_platform_send(const uint8_t* buf, uint16_t len, int32_t timeout_ms,
  *
  * @param[out] buf Pointer to the buffer to store the received data.
  * @param[in] count Maximum number of bytes to read.
- * @param[in] timeout_ms Timeout in milliseconds for the read operation.
+ * @param[in] timeout_ms Timeout in milliseconds for the read operation. Not used
  * @param[in] arg Optional argument for platform-specific use.
  *
  * @return The number of bytes read on success, -1 on failure.
  */
 int32_t nmbs_platform_read(uint8_t* buf, uint16_t count, int32_t timeout_ms, void* arg);
 
+/**
+ * Reads data from the established Modbus connection with a timeout.
+ *
+ * @param[out] buf Pointer to the buffer to store the received data.
+ * @param[in] count Maximum number of bytes to read.
+ * @param[in] timeout_ms Timeout in milliseconds for the read operation.
+ * @param[in] arg Optional argument for platform-specific use.
+ *
+ * @return The number of bytes read on success, -1 on failure.
+ */
 int32_t nmbs_platform_read_timeout(uint8_t* buf, uint16_t count, int32_t timeout_ms, void* arg);
 
 #endif

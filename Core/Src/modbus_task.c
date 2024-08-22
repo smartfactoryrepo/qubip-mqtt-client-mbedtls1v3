@@ -47,15 +47,20 @@ void ModbusClientTask(void *argument)
 		// Write once link is down
 		if(!netif_is_link_up(&gnetif))
 		{
-			LOG_DEBUG("Link is down\n");
+			MODBUS_TASK_DEBUG_LOG("[MODBUS_TASK] INFO: Link is down\n");
 		}
 		while(!netif_is_link_up(&gnetif))
 		{
 			osDelay(250);
 		}
-		LOG_DEBUG("Link is up\n");
+		MODBUS_TASK_DEBUG_LOG("[MODBUS_TASK] INFO: Link is up\n");
 
 		// Wait until connection with MQTT broker is established
+		// Write once
+		if(!mqttClient.isconnected)
+		{
+			MODBUS_TASK_DEBUG_LOG("[MODBUS_TASK] INFO: mqttClient is not connected\n");
+		}
 		while(!mqttClient.isconnected)
 		{
 			osDelay(250);
@@ -65,13 +70,13 @@ void ModbusClientTask(void *argument)
 		if(nmbs_platform_setup(&fd, &nmbs) == -1)
 		{
 			// Error
-			LOG_DEBUG("Error in nmbs_platform_setup, I'll try again in 1 second \n");
+			MODBUS_TASK_DEBUG_LOG("[MODBUS_TASK] ERROR: Error in nmbs_platform_setup, I'll try again in 1 second \n");
 			osDelay(1000);
 			continue;
 		}
 
 		// Connected to PLC via Modbus TCP!
-		LOG_DEBUG("Connected to plc!\n");
+		MODBUS_TASK_DEBUG_LOG("[MODBUS_TASK] INFO: Connected to plc!\n");
 		nmbs_error err = NMBS_ERROR_NONE;
 
 		do
@@ -81,16 +86,16 @@ void ModbusClientTask(void *argument)
 		    err = nmbs_read_holding_registers(&nmbs, MODBUS_PLC_REGISTER, 1, r_regs);
 		    if (err != NMBS_ERROR_NONE)
 		    {
-		        LOG_DEBUG("Error reading holding register at address %d - %s\n", MODBUS_PLC_REGISTER, nmbs_strerror(err));
+		        MODBUS_TASK_DEBUG_LOG("[MODBUS_TASK] ERROR: Error reading holding register at address %d - %s\n", MODBUS_PLC_REGISTER, nmbs_strerror(err));
 		        if (!nmbs_error_is_exception(err))
 		        {
-		        	LOG_DEBUG("Exception occurred in nmbs_read_holding_registers\n");
+		        	MODBUS_TASK_DEBUG_LOG("[MODBUS_TASK] ERROR: Exception occurred in nmbs_read_holding_registers\n");
 		        	continue;
 		        }
 		    }
 		    else
 		    {
-		    	LOG_DEBUG("Register at address %d: %d\n", MODBUS_PLC_REGISTER, r_regs[0]);
+		    	MODBUS_TASK_DEBUG_LOG("[MODBUS_TASK] INFO: Read register at address %d: %d\n", MODBUS_PLC_REGISTER, r_regs[0]);
 		    }
 
 		    // Send the new received data to the mqtt publisher task
@@ -101,10 +106,10 @@ void ModbusClientTask(void *argument)
 		    err = nmbs_write_multiple_registers(&nmbs, MODBUS_PLC_REGISTER, 1, w_regs);
 		    if (err != NMBS_ERROR_NONE)
 		    {
-		    	LOG_DEBUG("Error writing register at address %d - %s", MODBUS_PLC_REGISTER, nmbs_strerror(err));
+		    	MODBUS_TASK_DEBUG_LOG("[MODBUS_TASK] ERROR: Error writing register at address %d - %s", MODBUS_PLC_REGISTER, nmbs_strerror(err));
 		        if (!nmbs_error_is_exception(err))
 		        {
-		        	LOG_DEBUG("Exception occurred in nmbs_write_multiple_registers\n");
+		        	MODBUS_TASK_DEBUG_LOG("[MODBUS_TASK] ERROR: Exception occurred in nmbs_write_multiple_registers\n");
 		        	continue;
 		        }
 		    }

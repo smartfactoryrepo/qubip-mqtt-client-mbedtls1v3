@@ -25,15 +25,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <string.h>
-#include "lwip.h"
-#include "lwip/api.h"
-#include "MQTTClient.h"
-#include "MQTTInterface.h"
+#include "iwdg.h"
 #include "rng.h"
-#include "platform.h"
 #include "leds.h"
-#include "nanomodbus_interface.h"
+#include "platform.h"
 #include "iperf_server.h"
 #include "mqtt_task.h"
 #include "modbus_task.h"
@@ -45,7 +40,14 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define MODBUS_CLIENT_TASK_STACK_SIZE (2 * 1024)
+#if defined FREERTOS_DEBUG
+#define FREERTOS_DEBUG_LOG(message, ...) DEBUG_LOG(message, ##__VA_ARGS__)
+#else
+#define FREERTOS_DEBUG_LOG(message, ...)
+#endif
+
+
+#define MODBUS_CLIENT_TASK_STACK_SIZE (2048)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -63,8 +65,9 @@ static StaticTask_t modbusClientTask_tcb;
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
 
+// Use this prefix to place a variable in ccmram
 // __attribute__((section(".ccmram")))
-//__attribute__((section(".ccmram"))) volatile uint8_t ucHeap[ configTOTAL_HEAP_SIZE ];
+//__attribute__((section(".ccmram"))) uint8_t ucVarExample;
 
 
 /* Allocate two blocks of RAM for use by the heap.  The first is a block of
@@ -76,11 +79,13 @@ osThreadId defaultTaskHandle;
 #define RAM_REGION_HEAP_SIZE 98304
 
 volatile uint8_t heap[RAM_REGION_HEAP_SIZE] = { 0 }; // 192kb / 4
+__attribute__((section(".ccmram"))) volatile uint8_t ccmram_heap[0xFFFE] = { 0 };
 
 const HeapRegion_t xHeapRegions[] =
 {
 	// Point to ccmram
-    { ( uint8_t * ) 0x10000000UL, 0xFFFE },
+    //{ ( uint8_t * ) 0x10000000UL, 0xFFFE },
+	{ ( uint8_t * ) &ccmram_heap, 0xFFFE },
 	{ ( uint8_t * ) &heap, RAM_REGION_HEAP_SIZE },
     { NULL, 0 } /* Terminates the array. */
 };
@@ -111,10 +116,10 @@ void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName)
   /* Run time stack overflow checking is performed if
    configCHECK_FOR_STACK_OVERFLOW is defined to 1 or 2. This hook function is
    called if a stack overflow is detected. */
-  LOG_DEBUG("\r\n!!! stack overflow detected in task: %s !!!\r\n", pcTaskName);
+	FREERTOS_DEBUG_LOG("\r\n[FREERTOS] ERROR: !!! stack overflow detected in task: %s !!!\r\n", pcTaskName);
   size_t freeHeapSize = xPortGetFreeHeapSize();
   size_t minimumEverFreeHeapSize = xPortGetMinimumEverFreeHeapSize();
-  LOG_DEBUG("freeHeapSize: %u bytes, minimumEverFreeHeapSize: %u bytes\r\n", (unsigned int)freeHeapSize, (unsigned int)minimumEverFreeHeapSize);
+  FREERTOS_DEBUG_LOG("[FREERTOS] ERROR: freeHeapSize: %u bytes, minimumEverFreeHeapSize: %u bytes\r\n", (unsigned int)freeHeapSize, (unsigned int)minimumEverFreeHeapSize);
   while(1)
   {
 	  leds_blink_on_stackoverflow();
@@ -124,10 +129,10 @@ void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName)
 void vApplicationMallocFailedHook(void)
 {
 	// configUSE_MALLOC_FAILED_HOOK
-	LOG_DEBUG("\r\n!!! Malloc Failed !!!\r\n");
+	FREERTOS_DEBUG_LOG("\r\n[FREERTOS] ERROR: !!! Malloc Failed !!!\r\n");
 	size_t freeHeapSize = xPortGetFreeHeapSize();
 	size_t minimumEverFreeHeapSize = xPortGetMinimumEverFreeHeapSize();
-	LOG_DEBUG("freeHeapSize: %u bytes, minimumEverFreeHeapSize: %u bytes\r\n", (unsigned int)freeHeapSize, (unsigned int)minimumEverFreeHeapSize);
+	FREERTOS_DEBUG_LOG("[FREERTOS] ERROR: freeHeapSize: %u bytes, minimumEverFreeHeapSize: %u bytes\r\n", (unsigned int)freeHeapSize, (unsigned int)minimumEverFreeHeapSize);
 	while(1)
 	{
 		leds_flash_error_on_malloc_failure();
@@ -140,7 +145,7 @@ void vApplicationGetRandomHeapCanary( portPOINTER_SIZE_TYPE * pxHeapCanary )
 	if(HAL_RNG_GenerateRandomNumber(&hrng, &randomValue) != HAL_OK)
 	{
 		randomValue = ((HAL_GetTick() * HAL_GetUIDw0()) + HAL_GetUIDw1()) ^ HAL_GetUIDw2();
-		LOG_DEBUG("RNG failed, manual rng num randomValue: %u\r\n", (unsigned int)randomValue);
+		FREERTOS_DEBUG_LOG("[FREERTOS] ERROR: RNG failed, manual rng num randomValue: %u\r\n", (unsigned int)randomValue);
 	}
 	*pxHeapCanary = randomValue;
 }
@@ -210,7 +215,7 @@ void* my_calloc(size_t nmemb, size_t size)
 	void *ptr = pvPortCalloc(nmemb, size);
 	if (ptr == NULL)
 	{
-		LOG_DEBUG("Failed to allocate %u bytes\r\n", (unsigned int)(nmemb * size));
+		FREERTOS_DEBUG_LOG("[FREERTOS] ERROR: Failed to allocate %u bytes\r\n", (unsigned int)(nmemb * size));
 	}
 	return ptr;
 }
@@ -233,13 +238,8 @@ void MX_FREERTOS_Init(void)
 {
   /* USER CODE BEGIN Init */
   /* Pass the array into vPortDefineHeapRegions(). */
-  int ret = mbedtls_platform_set_calloc_free(my_calloc, my_free);
-  if (ret != 0)
-  {
-	  // Gestione dell'errore
-	  LOG_DEBUG("\r\nmbedtls_platform_set_calloc_free failed\r\n");
-  }
   vPortDefineHeapRegions( xHeapRegions );
+  mbedtls_platform_set_calloc_free(my_calloc, my_free);
   /* USER CODE END Init */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -283,8 +283,12 @@ void StartDefaultTask(void const * argument)
   /* USER CODE BEGIN StartDefaultTask */
 
 #ifdef IPERF_SERVER_ENABLED
-  LOG_DEBUG("IPERF server enabled\n");
-  iperf_server_init();
+  FREERTOS_DEBUG_LOG("[FREERTOS] INFO: IPERF server init\n");
+  if(iperf_server_init() != ERR_OK)
+  {
+	  FREERTOS_DEBUG_LOG("[FREERTOS] ERROR: IPERF server init failed\n");
+  }
+  FREERTOS_DEBUG_LOG("[FREERTOS] INFO: IPERF server enabled\n");
 #endif
 
 
@@ -292,42 +296,60 @@ void StartDefaultTask(void const * argument)
   // Publish mqtt task
   osThreadDef(mqttClientPubTask, MqttClientPubTask, osPriorityNormal, 0, (8.5 * 1024) / sizeof( StackType_t ) );
   mqttClientPubTaskHandle = osThreadCreate(osThread(mqttClientPubTask), NULL);
+  if(mqttClientPubTaskHandle == NULL)
+  {
+	  FREERTOS_DEBUG_LOG("[FREERTOS] ERROR: Failed to create mqttClientPub Task\n");
+	  while(1)
+	  {
+		  leds_blink_freertos_task_creation_failed();
+		  // wait a system reset, caused by iwdg
+	  }
+  }
 
   // Stack size calculated with static stack analyzer
   // Subscribe mqtt task
   osThreadDef(mqttClientSubTask, MqttClientSubTask, osPriorityNormal, 0, (8 * 1024 ) / sizeof( StackType_t ) );
   mqttClientSubTaskHandle = osThreadCreate(osThread(mqttClientSubTask), NULL);
-
-
-  // Wait the connection with the mqtt broker before attempt the PLC connection.
-  if(!mqttClient.isconnected)
+  if(mqttClientSubTaskHandle == NULL)
   {
-	  osDelay(250);
+	  FREERTOS_DEBUG_LOG("[FREERTOS] ERROR: Failed to create mqttClientSub Task\n");
+	  while(1)
+	  {
+		  leds_blink_freertos_task_creation_failed();
+		  // wait a system reset, caused by iwdg
+	  }
   }
 
   // To add another task by dynamically allocating its stack, the heap space must be increased.
   // Or you statically allocate the stack.
   // Modbus task
-  //osThreadDef(modbusClientTask, ModbusClientTask, osPriorityNormal, 0, (1 * 1024) / sizeof( StackType_t ));
+  //osThreadDef(modbusClientTask, ModbusClientTask, osPriorityNormal, 0, MODBUS_CLIENT_TASK_STACK_SIZE / sizeof( StackType_t ));
   /* Creazione del task utilizzando l'allocazione statica di FreeRTOS */
-  xTaskCreateStatic(
-		  ModbusClientTask,       		/* Function that implements the task. */
-          "ModbusClientTask",          	/* Text name for the task. */
-		  MODBUS_CLIENT_TASK_STACK_SIZE / sizeof( StackType_t ), /* Number of indexes in the xStack array. */
-          NULL,                 		/* Parameter passed into the task. */
-		  osPriorityNormal,     		/* Priority at which the task is created. */
-		  modbusClientTask_stack,       /* Array to use as the task's stack. */
-          &modbusClientTask_tcb );  	/* Variable to hold the task's data structure. */
+  TaskHandle_t modbusClientTaskHandle = xTaskCreateStatic
+		  (
+			  ModbusClientTask,       		/* Function that implements the task. */
+			  "ModbusClientTask",          	/* Text name for the task. */
+			  MODBUS_CLIENT_TASK_STACK_SIZE / sizeof( StackType_t ), /* Number of indexes in the xStack array. */
+			  NULL,                 		/* Parameter passed into the task. */
+			  osPriorityNormal,     		/* Priority at which the task is created. */
+			  modbusClientTask_stack,       /* Array to use as the task's stack. */
+			  &modbusClientTask_tcb			/* Variable to hold the task's data structure. */
+		  );
 
+  if(modbusClientTaskHandle == NULL)
+  {
+	  FREERTOS_DEBUG_LOG("[FREERTOS] ERROR: Failed to create modbusClient Task\n");
+	  while(1)
+	  {
+		  leds_blink_freertos_task_creation_failed();
+		  // wait a system reset, caused by iwdg
+	  }
+  }
 
   /* Infinite loop */
   for(;;)
   {
-//	  MQTTDisconnect(&mqttClient);
-//	  net_disconnect(&mqttNet);
-//	  net_clear();
-//	  MqttConnectBroker();
-//
+	  __HAL_IWDG_RELOAD_COUNTER(&hiwdg);
 	  osDelay(1000);
   }
   /* USER CODE END StartDefaultTask */
@@ -335,8 +357,4 @@ void StartDefaultTask(void const * argument)
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
-
-
-
-
 /* USER CODE END Application */

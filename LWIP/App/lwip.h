@@ -44,8 +44,18 @@
 
 /* USER CODE END 0 */
 
+ /* Private define ------------------------------------------------------------*/
+ #if defined LWIP_EVENT_DEBUG
+ #define LWIP_EVENT_DEBUG_LOG(message, ...) DEBUG_LOG(message, ##__VA_ARGS__)
+ #else
+ #define LWIP_EVENT_DEBUG_LOG(message, ...)
+ #endif
+
+
 /* Global Variables ----------------------------------------------------------*/
 extern ETH_HandleTypeDef heth;
+
+
 
 /* LWIP init function */
 void MX_LWIP_Init(void);

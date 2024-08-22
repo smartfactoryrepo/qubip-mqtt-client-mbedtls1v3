@@ -147,7 +147,7 @@ static void ethernet_link_status_updated(struct netif *netif)
 		/* USER CODE BEGIN 5 */
 		HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_SET);
 		HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-		LOG_DEBUG("Ethernet link up\n");
+		LWIP_EVENT_DEBUG_LOG("[LWIP EVENT] INFO: Ethernet link up\n");
 		/* USER CODE END 5 */
 	}
 	else /* netif is down */
@@ -155,7 +155,7 @@ static void ethernet_link_status_updated(struct netif *netif)
 		/* USER CODE BEGIN 6 */
 		HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
 		HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
-		LOG_DEBUG("Ethernet link down\n");
+		LWIP_EVENT_DEBUG_LOG("[LWIP EVENT] INFO: Ethernet link down\n");
 		/* USER CODE END 6 */
 	}
 }

@@ -1,6 +1,6 @@
 /**
  ******************************************************************************
- * File Name          : freertos.c
+ * File Name          : MQTTInterface.c
  * Description        : Code for freertos applications
  ******************************************************************************
  * @attention
@@ -135,14 +135,14 @@ const size_t client_key_len = sizeof(client_key);
 
 
 #ifdef MQTT_LWIP_SOCKET
-void NewNetwork(Network *n) {
+void mqtt_network_init(Network *n) {
 	n->socket = 0; //clear
-	n->mqttread = net_read; //receive function
-	n->mqttwrite = net_write; //send function
-	n->disconnect = net_disconnect; //disconnection function
+	n->mqttread = mqtt_network_read; //receive function
+	n->mqttwrite = mqtt_network_write; //send function
+	n->disconnect = mqtt_network_disconnect; //disconnection function
 }
 
-int ConnectNetwork(Network *n, char *ip, int port) {
+int mqtt_network_connect(Network *n, char *ip, int port) {
 	struct sockaddr_in server_addr;
 
 	if(n->socket)
@@ -170,7 +170,7 @@ int ConnectNetwork(Network *n, char *ip, int port) {
 	return 0;
 }
 
-int net_read(Network *n, unsigned char *buffer, int len, int timeout_ms) {
+int mqtt_network_read(Network *n, unsigned char *buffer, int len, int timeout_ms) {
 	int available;
 
 	/* !!! LWIP_SO_RCVBUF must be enabled !!! */
@@ -184,11 +184,11 @@ int net_read(Network *n, unsigned char *buffer, int len, int timeout_ms) {
 	return 0;
 }
 
-int net_write(Network *n, unsigned char *buffer, int len, int timeout_ms) {
+int mqtt_network_write(Network *n, unsigned char *buffer, int len, int timeout_ms) {
 	return send(n->socket, buffer, len, 0);
 }
 
-void net_disconnect(Network *n) {
+void mqtt_network_disconnect(Network *n) {
 	close(n->socket);
 	n->socket = 0;
 }
@@ -197,26 +197,30 @@ void net_disconnect(Network *n) {
 
 static void my_debug(void *ctx, int level, const char *file, int line, const char *str) {
 	((void) level);
-	//mbedtls_fLOG_DEBUG((FILE*) ctx, "%s:%04d: %s", file, line, str);
+	//mbedtls_fprintf((FILE*) ctx, "%s:%04d: %s", file, line, str);
 	//fprintf((FILE*) ctx, "%s:%04d: %s", file, line, str);
-	LOG_DEBUG("%s:%04d: %s", file, line, str);
+	MQTT_INTERFACE_DEBUG_LOG("[MQTT_INTERFACE]: %s:%04d: %s", file, line, str);
 	fflush((FILE*) ctx);
 }
 
 
-void NewNetwork(Network *n) {
+void mqtt_network_init(Network *n) {
 	n->socket = 0; //clear
-	n->mqttread = net_read; //receive function
-	n->mqttwrite = net_write; //send function
-	n->disconnect = net_disconnect; //disconnection function
+	n->mqttread = mqtt_network_read; //receive function
+	n->mqttwrite = mqtt_network_write; //send function
+	n->disconnect = mqtt_network_disconnect; //disconnection function
 }
 
-int ConnectNetwork(Network *n, char *ip, char * port) {
+int mqtt_network_connect(Network *n, char *ip, char * port) {
 	int ret = 0;
 
 #if defined(MBEDTLS_DEBUG_C) && defined(DEBUG)
 	mbedtls_debug_set_threshold(99);
 #endif
+
+	// Initialize the network interface
+	mqtt_network_init(n);
+	mqtt_network_clear();
 
 	//mbedtls_net_init( &server_fd ); // MX_LWIP_Init() is called already
 	mbedtls_ssl_init(&ssl);
@@ -229,7 +233,7 @@ int ConnectNetwork(Network *n, char *ip, char * port) {
 
 	ret = psa_crypto_init();
 	if(ret != PSA_SUCCESS) {
-		LOG_DEBUG("psa_crypto_init failed.\n");
+		MQTT_INTERFACE_DEBUG_LOG("[MQTT_INTERFACE] ERROR: psa_crypto_init failed.\n");
 		return -1;
 	}
 
@@ -237,14 +241,14 @@ int ConnectNetwork(Network *n, char *ip, char * port) {
 	                           (const unsigned char *) pers,
 	                           strlen( pers ) ) ) != 0 )
 	{
-		LOG_DEBUG(" failed\n  ! mbedtls_ctr_drbg_seed returned %d\n", ret );
+		MQTT_INTERFACE_DEBUG_LOG("[MQTT_INTERFACE] ERROR: mbedtls_ctr_drbg_seed returned %d\n", ret );
 	    return -1;
 	}
 
 	// Processi SSL/TLS
 	ret = mbedtls_x509_crt_parse(&cacert, (const unsigned char*) mbedtls_root_certificate, mbedtls_root_certificate_len);
 	if (ret < 0) {
-		LOG_DEBUG("mbedtls_x509_crt_parse failed.\n");
+		MQTT_INTERFACE_DEBUG_LOG("[MQTT_INTERFACE] ERROR: mbedtls_x509_crt_parse failed.\n");
 	    return -1;
 	}
 
@@ -253,21 +257,21 @@ int ConnectNetwork(Network *n, char *ip, char * port) {
 #if !defined(TLS_1V2) && defined(TLS_1V3)
 	ret = mbedtls_x509_crt_parse(&clicert, (const unsigned char *)client_cert, client_cert_len);
 	if (ret != 0) {
-		LOG_DEBUG("mbedtls_x509_crt_parse failed\n");
+		MQTT_INTERFACE_DEBUG_LOG("[MQTT_INTERFACE] ERROR: mbedtls_x509_crt_parse failed\n");
 	    return -1;
 	}
 
 	// Aggiungi caricamento della chiave cliente
 	ret = mbedtls_pk_parse_key(&pkey, (const unsigned char *) client_key, client_key_len, NULL, 0, mbedtls_ctr_drbg_random, &ctr_drbg);
 	if (ret != 0) {
-		LOG_DEBUG("mbedtls_pk_parse_key failed.\n");
+		MQTT_INTERFACE_DEBUG_LOG("[MQTT_INTERFACE] ERROR: mbedtls_pk_parse_key failed.\n");
 	    return -1;
 	}
 
 	// Configura il certificato e la chiave privata nel contesto SSL
 	ret = mbedtls_ssl_conf_own_cert(&conf, &clicert, &pkey);
 	if (ret != 0) {
-		LOG_DEBUG("mbedtls_ssl_conf_own_cert failed.\n");
+		MQTT_INTERFACE_DEBUG_LOG("[MQTT_INTERFACE] ERROR: mbedtls_ssl_conf_own_cert failed.\n");
 	    return -1;
 	}
 #endif
@@ -276,7 +280,7 @@ int ConnectNetwork(Network *n, char *ip, char * port) {
 	ret = mbedtls_ssl_config_defaults(&conf, MBEDTLS_SSL_IS_CLIENT,
 	        MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT);
 	if (ret < 0) {
-		LOG_DEBUG("mbedtls_ssl_config_defaults failed.\n");
+		MQTT_INTERFACE_DEBUG_LOG("[MQTT_INTERFACE] ERROR: mbedtls_ssl_config_defaults failed.\n");
 	    return -1;
 	}
 
@@ -298,22 +302,22 @@ int ConnectNetwork(Network *n, char *ip, char * port) {
 
 	ret = mbedtls_ssl_setup(&ssl, &conf);
 	if (ret < 0) {
-	    LOG_DEBUG("mbedtls_ssl_setup failed.\n");
+		MQTT_INTERFACE_DEBUG_LOG("[MQTT_INTERFACE] ERROR: mbedtls_ssl_setup failed.\n");
 	    return -1;
 	}
 
 	ret = mbedtls_ssl_set_hostname(&ssl, ip); // if the handshake fail check here
 	if (ret < 0) {
-	    LOG_DEBUG("mbedtls_ssl_set_hostname failed.\n");
+		MQTT_INTERFACE_DEBUG_LOG("[MQTT_INTERFACE] ERROR: mbedtls_ssl_set_hostname failed.\n");
 	    return -1;
 	}
 
 	mbedtls_ssl_set_bio(&ssl, &server_fd, mbedtls_net_send, mbedtls_net_recv, NULL);
 
 	// register functions
-	n->mqttread = net_read; //receive function
-	n->mqttwrite = net_write; //send function
-	n->disconnect = net_disconnect; //disconnection function
+	n->mqttread = mqtt_network_read; //receive function
+	n->mqttwrite = mqtt_network_write; //send function
+	n->disconnect = mqtt_network_disconnect; //disconnection function
 
 
 
@@ -321,24 +325,20 @@ int ConnectNetwork(Network *n, char *ip, char * port) {
 
 	ret = mbedtls_net_connect(&server_fd, (const char*)ip, port, MBEDTLS_NET_PROTO_TCP);
 	if (ret < 0) {
-		LOG_DEBUG("mbedtls_net_connect failed.\n");
+		MQTT_INTERFACE_DEBUG_LOG("[MQTT_INTERFACE] ERROR: mbedtls_net_connect failed.\n");
 		return -1;
 	}
 
 	while ((ret = mbedtls_ssl_handshake(&ssl)) != 0) {
 		if (ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE) {
-			LOG_DEBUG("mbedtls_ssl_handshake failed.\n");
-			while(1)
-			{
-				leds_indicate_tls_handshake_failure();
-			}
-			return -1;
+			MQTT_INTERFACE_DEBUG_LOG("[MQTT_INTERFACE] ERROR: mbedtls_ssl_handshake failed.\n");
+			return -2;
 		}
 	}
 
 	ret = mbedtls_ssl_get_verify_result(&ssl);
 	if (ret < 0) {
-		LOG_DEBUG("mbedtls_ssl_get_verify_result failed.\n");
+		MQTT_INTERFACE_DEBUG_LOG("[MQTT_INTERFACE] ERROR: mbedtls_ssl_get_verify_result failed.\n");
 		return -1;
 	}
 
@@ -346,7 +346,7 @@ int ConnectNetwork(Network *n, char *ip, char * port) {
 }
 
 
-int net_read(Network *n, unsigned char *buffer, int len, int timeout_ms) {
+int mqtt_network_read(Network *n, unsigned char *buffer, int len, int timeout_ms) {
 	int ret;
 	int received = 0;
 	int error = 0;
@@ -374,7 +374,7 @@ int net_read(Network *n, unsigned char *buffer, int len, int timeout_ms) {
 }
 
 
-int net_write(Network *n, unsigned char *buffer, int len, int timeout_ms) {
+int mqtt_network_write(Network *n, unsigned char *buffer, int len, int timeout_ms) {
 	int ret;
 	int written;
 
@@ -391,7 +391,7 @@ int net_write(Network *n, unsigned char *buffer, int len, int timeout_ms) {
 }
 
 
-void net_disconnect(Network *n) {
+void mqtt_network_disconnect(Network *n) {
 	int ret;
 
 	do {
@@ -403,11 +403,12 @@ void net_disconnect(Network *n) {
 }
 
 
-void net_clear() {
+void mqtt_network_clear() {
 	mbedtls_net_free(&server_fd);
 	mbedtls_x509_crt_free(&cacert);
-	mbedtls_x509_crt_init(&clicert);
-	mbedtls_pk_init(&pkey);
+	mbedtls_x509_crt_free(&clicert);
+	mbedtls_pk_free(&pkey);
+	mbedtls_psa_crypto_free();
 	mbedtls_ssl_free(&ssl);
 	mbedtls_ssl_config_free(&conf);
 	mbedtls_ctr_drbg_free(&ctr_drbg);
@@ -416,17 +417,17 @@ void net_clear() {
 
 #endif
 #ifdef MQTT_LWIP_NETCONN
-void NewNetwork(Network *n) {
+void mqtt_network_init(Network *n) {
 	n->conn = NULL;
 	n->buf = NULL;
 	n->offset = 0;
 
-	n->mqttread = net_read;
-	n->mqttwrite = net_write;
-	n->disconnect = net_disconnect;
+	n->mqttread = mqtt_network_read;
+	n->mqttwrite = mqtt_network_write;
+	n->disconnect = mqtt_network_disconnect;
 }
 
-int ConnectNetwork(Network *n, char *ip, int port) {
+int mqtt_network_connect(Network *n, char *ip, int port) {
 	err_t err;
 	ip_addr_t server_ip;
 
@@ -445,7 +446,7 @@ int ConnectNetwork(Network *n, char *ip, int port) {
 	return 0;
 }
 
-int net_read(Network *n, unsigned char *buffer, int len, int timeout_ms) {
+int mqtt_network_read(Network *n, unsigned char *buffer, int len, int timeout_ms) {
 	int rc;
 	struct netbuf *inbuf;
 	int offset = 0;
@@ -485,13 +486,13 @@ int net_read(Network *n, unsigned char *buffer, int len, int timeout_ms) {
 	return bytes;
 }
 
-int net_write(Network *n, unsigned char *buffer, int len, int timeout_ms) {
+int mqtt_network_write(Network *n, unsigned char *buffer, int len, int timeout_ms) {
 	int rc = netconn_write(n->conn, buffer, len, NETCONN_NOCOPY);
 	if(rc != ERR_OK) return -1;
 	return len;
 }
 
-void net_disconnect(Network *n) {
+void mqtt_network_disconnect(Network *n) {
 	netconn_close(n->conn); //close session
 	netconn_delete(n->conn); //free memory
 	n->conn = NULL;

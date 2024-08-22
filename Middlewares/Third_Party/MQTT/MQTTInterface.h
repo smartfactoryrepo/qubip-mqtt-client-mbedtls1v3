@@ -25,15 +25,24 @@
 
 #ifndef __MQTT_INTERFACE_H_
 #define __MQTT_INTERFACE_H_
-
+/* Private includes ----------------------------------------------------------*/
 #include "cmsis_os.h"
 
-
+/* Private define ------------------------------------------------------------*/
+/* CONFIG */
 #define MQTT_LWIP_SOCKET_TLS  //Use SOCKET API WITH TLS
 //#define MQTT_LWIP_SOCKET	//Use SOCKET API
 //#define MQTT_LWIP_NETCONN //Use NETCONN API
 
 
+#if defined MQTT_INTERFACE_DEBUG
+#define MQTT_INTERFACE_DEBUG_LOG(message, ...) DEBUG_LOG(message, ##__VA_ARGS__)
+#else
+#define MQTT_INTERFACE_DEBUG_LOG(message, ...)
+#endif
+
+
+/* Typedef -----------------------------------------------------------*/
 typedef struct Timer Timer;
 
 struct Timer {
@@ -58,22 +67,26 @@ struct Network
 	void (*disconnect) (Network*);
 };
 
+/* Extern variables ----------------------------------------------------------*/
+
+/* Private function prototypes -----------------------------------------------*/
+
 void InitTimer(Timer*);
 char TimerIsExpired(Timer*);
 void TimerCountdownMS(Timer*, unsigned int);
 void TimerCountdown(Timer*, unsigned int);
 int  TimerLeftMS(Timer*);
 
-int  net_read(Network*, unsigned char*, int, int);
-int  net_write(Network*, unsigned char*, int, int);
-void net_disconnect(Network*);
-void NewNetwork(Network*);
-void net_clear(void);
+int  mqtt_network_read(Network*, unsigned char*, int, int);
+int  mqtt_network_write(Network*, unsigned char*, int, int);
+void mqtt_network_disconnect(Network*);
+void mqtt_network_init(Network*);
+void mqtt_network_clear(void);
 #ifdef MQTT_LWIP_SOCKET_TLS
-int  ConnectNetwork(Network*, char*, char*);
+int  mqtt_network_connect(Network*, char*, char*);
 #endif
 #ifdef MQTT_LWIP_SOCKET
-int  ConnectNetwork(Network*, char*, int);
+int  mqtt_network_connect(Network*, char*, int);
 #endif
 
 #ifdef MQTT_TASK

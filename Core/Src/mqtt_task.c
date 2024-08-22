@@ -105,16 +105,16 @@ void MqttClientPubTask(void const *argument)
 		// Write once link is down
 		if(!netif_is_link_up(&gnetif))
 		{
-			LOG_DEBUG("Link is down\n");
+			MQTT_PUB_TASK_DEBUG_LOG("[MQTT_PUB_TASK] INFO: Link is down\n");
 		}
 		while(!netif_is_link_up(&gnetif))
 		{
 			osDelay(250);
 		}
-		LOG_DEBUG("Link is up\n");
+		MQTT_PUB_TASK_DEBUG_LOG("[MQTT_PUB_TASK] INFO: Link is up\n");
 
 		// Have valid IP?
-		LOG_DEBUG("Waiting for valid ip address\n");
+		MQTT_PUB_TASK_DEBUG_LOG("[MQTT_PUB_TASK] INFO: Waiting for valid ip address\n");
 		while (gnetif.ip_addr.addr == 0 || gnetif.netmask.addr == 0 || gnetif.gw.addr == 0)
 		{
 			// System has no valid ip address, wait for 1/4 second
@@ -122,15 +122,16 @@ void MqttClientPubTask(void const *argument)
 		}
 
 		// IP address is valid, log the details
-		LOG_DEBUG("DHCP/Static IP O.K.\n");
-		LOG_DEBUG("IP %lu.%lu.%lu.%lu\n\r",(gnetif.ip_addr.addr & 0xff), ((gnetif.ip_addr.addr >> 8) & 0xff), ((gnetif.ip_addr.addr >> 16) & 0xff), (gnetif.ip_addr.addr >> 24));
+		MQTT_PUB_TASK_DEBUG_LOG("[MQTT_PUB_TASK] INFO: DHCP/Static IP O.K.\n");
+		MQTT_PUB_TASK_DEBUG_LOG("[MQTT_PUB_TASK] INFO: IP %lu.%lu.%lu.%lu\n\r",(gnetif.ip_addr.addr & 0xff), ((gnetif.ip_addr.addr >> 8) & 0xff), ((gnetif.ip_addr.addr >> 16) & 0xff), (gnetif.ip_addr.addr >> 24));
 
 		// Connect to the broker
 		MQTTDisconnect(&mqttClient);
-		net_disconnect(&mqttNet);
-		net_clear();
+		mqtt_network_disconnect(&mqttNet);
+		mqtt_network_clear();
 		if(MqttConnectBroker() < 0)
 		{
+			osDelay(250);
 			continue;
 		}
 
@@ -156,12 +157,12 @@ void MqttClientPubTask(void const *argument)
 			if(MQTTPublish(&mqttClient, "2023/test", &message) != MQTT_SUCCESS)
 			{
 				MQTTCloseSession(&mqttClient);
-				net_disconnect(&mqttNet);
+				mqtt_network_disconnect(&mqttNet);
 				error = 1;
 				continue;
 			}
 
-			LOG_DEBUG("[%lu] I've sent a message!\n", ulNotifiedValue);
+			MQTT_PUB_TASK_DEBUG_LOG("[MQTT_PUB_TASK] INFO: [%lu] I've sent a message!\n", ulNotifiedValue);
 			leds_blink_on_mqtt_message_sent();
 
 			// The vTaskDelayUntil() suspend a task for up to an absolute amount of time,
@@ -184,7 +185,7 @@ void ethernet_status_updated(struct netif *netif)
 {
 	// Force a reconnect
 	need_to_reconnect = 1;
-	LOG_DEBUG("Force a reconnect!\n");
+	DEBUG_LOG("[LWIP_EVENT] INFO: Force a reconnect!\n");
 }
 
 
@@ -193,26 +194,38 @@ void ethernet_status_updated(struct netif *netif)
  * @param argument: None
  * @retval MQTT_SUCCESS on success, or an MQTT error code on failure.
  */
-int MqttConnectBroker()
+int MqttConnectBroker(void)
 {
   int ret;
 
-  // Initialize the network interface
-  NewNetwork(&mqttNet);
-  net_clear();
-  ret = ConnectNetwork(&mqttNet, BROKER_IP, MQTT_PORT);
+  // Connect to MQTT broker
+  ret = mqtt_network_connect(&mqttNet, BROKER_IP, MQTT_PORT);
 
   // Log heap statistics for debugging.
-  LOG_DEBUG("freeHeapSize: %u bytes, minimumEverFreeHeapSize: %u bytes\r\n", (unsigned int)xPortGetFreeHeapSize(), (unsigned int)xPortGetMinimumEverFreeHeapSize());
+  MQTT_PUB_TASK_DEBUG_LOG("[MQTT_PUB_TASK] INFO: freeHeapSize: %u bytes, minimumEverFreeHeapSize: %u bytes\r\n", (unsigned int)xPortGetFreeHeapSize(), (unsigned int)xPortGetMinimumEverFreeHeapSize());
 
   HeapStats_t pxHeapStats;
   vPortGetHeapStats( &pxHeapStats );
 
+  MQTT_PUB_TASK_DEBUG_LOG("[MQTT_PUB_TASK] INFO: Heap Statistics:\n");
+  MQTT_PUB_TASK_DEBUG_LOG("[MQTT_PUB_TASK] INFO:   Available Heap Space:\t%lu bytes\n", (unsigned long)pxHeapStats.xAvailableHeapSpaceInBytes);
+  MQTT_PUB_TASK_DEBUG_LOG("[MQTT_PUB_TASK] INFO:   Largest Free Block: \t%lu bytes\n", (unsigned long)pxHeapStats.xSizeOfLargestFreeBlockInBytes);
+  MQTT_PUB_TASK_DEBUG_LOG("[MQTT_PUB_TASK] INFO:   Smallest Free Block: \t%lu bytes\n", (unsigned long)pxHeapStats.xSizeOfSmallestFreeBlockInBytes);
+  MQTT_PUB_TASK_DEBUG_LOG("[MQTT_PUB_TASK] INFO:   Number of Free Blocks:\t%lu\n", (unsigned long)pxHeapStats.xNumberOfFreeBlocks);
+  MQTT_PUB_TASK_DEBUG_LOG("[MQTT_PUB_TASK] INFO:   Minimum Ever Free Bytes:\t%lu bytes\n", (unsigned long)pxHeapStats.xMinimumEverFreeBytesRemaining);
+  MQTT_PUB_TASK_DEBUG_LOG("[MQTT_PUB_TASK] INFO:   Successful Allocations:\t%lu\n", (unsigned long)pxHeapStats.xNumberOfSuccessfulAllocations);
+  MQTT_PUB_TASK_DEBUG_LOG("[MQTT_PUB_TASK] INFO:   Successful Frees:    \t%lu\n", (unsigned long)pxHeapStats.xNumberOfSuccessfulFrees);
+  // If ret is tls handshake failed
+  if(ret == -2)
+  {
+	  leds_indicate_tls_handshake_failure();
+  }
+
   if(ret != MQTT_SUCCESS)
   {
 	  // Handle network connection failure.
-	  LOG_DEBUG("\r\nConnectNetwork failed.\r\n");
-	  net_disconnect(&mqttNet);
+	  MQTT_PUB_TASK_DEBUG_LOG("\r\n[MQTT_PUB_TASK] ERROR: ConnectNetwork failed.\r\n");
+	  mqtt_network_disconnect(&mqttNet);
 	  return -1;
   }
 
@@ -233,9 +246,9 @@ int MqttConnectBroker()
   if(ret != MQTT_SUCCESS)
   {
 	  // Handle MQTT connection failure
-	  LOG_DEBUG("MQTTConnect failed.\n");
+	  MQTT_PUB_TASK_DEBUG_LOG("[MQTT_PUB_TASK] ERROR: MQTTConnect failed.\n");
 	  MQTTCloseSession(&mqttClient);
-	  net_disconnect(&mqttNet);
+	  mqtt_network_disconnect(&mqttNet);
 	  return ret;
   }
 
@@ -244,13 +257,13 @@ int MqttConnectBroker()
   if(ret != MQTT_SUCCESS)
   {
 	  // Handle subscription failure
-	  LOG_DEBUG("MQTTSubscribe failed.\n");
+	  MQTT_PUB_TASK_DEBUG_LOG("[MQTT_PUB_TASK] ERROR: MQTTSubscribe failed.\n");
 	  MQTTCloseSession(&mqttClient);
-	  net_disconnect(&mqttNet);
+	  mqtt_network_disconnect(&mqttNet);
 	  return ret;
   }
 
-  LOG_DEBUG("MQTT_ConnectBroker O.K.\n");
+  MQTT_PUB_TASK_DEBUG_LOG("[MQTT_PUB_TASK] INFO: MQTT_ConnectBroker O.K.\n");
   return MQTT_SUCCESS;
 }
 
@@ -270,6 +283,6 @@ void MqttMessageArrived(MessageData* msg)
     memcpy(msgBuffer, message->payload, message->payloadlen);
 
     // Log the received message payload and its length.
-    LOG_DEBUG("MQTT MSG[%d]:%s\n", (int)message->payloadlen, msgBuffer);
+    MQTT_SUB_TASK_DEBUG_LOG("[MQTT_SUB_TASK] INFO: MQTT MSG[%d]:%s\n", (int)message->payloadlen, msgBuffer);
 }
 
