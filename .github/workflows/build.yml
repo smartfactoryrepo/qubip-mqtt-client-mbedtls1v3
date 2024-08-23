@@ -19,5 +19,5 @@ jobs:
     - name: STM32CubeIDE build
       uses: xanderhendriks/action-build-stm32cubeide@v13.0
       with:
-        project-path: '.'  # Usa la cartella principale del progetto
-        build-config: 'Debug'  # O 'Release' a seconda delle tue esigenze
+        project-path: '.'  # Specifica la cartella principale del progetto
+        project-target: 'Debug'  # Specifica il target di build (es. Debug o Release)
