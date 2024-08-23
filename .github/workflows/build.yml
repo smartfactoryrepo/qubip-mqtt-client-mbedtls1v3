@@ -25,4 +25,13 @@ jobs:
       with:
         project-path: '.'  # Specifica la cartella principale del progetto
         project-target: 'qubip-mqtt-client-mbedtls1v3/Debug'  # Specifica il target di build (es. Debug o Release)
-        #entryPoint: '.cproject'  # Sostituisci con il tuo file .cproject
+
+    - name: List directory contents 2
+      run: ls -lha
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: my-artifact
+        path: qubip-mqtt-client-mbedtls1v3.elf
+
