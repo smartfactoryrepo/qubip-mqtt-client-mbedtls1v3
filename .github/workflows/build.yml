@@ -27,11 +27,11 @@ jobs:
         project-target: 'qubip-mqtt-client-mbedtls1v3/Debug'  # Specifica il target di build (es. Debug o Release)
 
     - name: List directory contents 2
-      run: ls -lha
+      run: ls Debug/ -lha
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: my-artifact
-        path: qubip-mqtt-client-mbedtls1v3.elf
+        path: Debug/qubip-mqtt-client-mbedtls1v3.*
 
