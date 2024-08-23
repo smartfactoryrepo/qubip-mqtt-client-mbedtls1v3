@@ -25,4 +25,4 @@ jobs:
       with:
         project-path: '.'  # Specifica la cartella principale del progetto
         project-target: 'target/Debug'  # Specifica il target di build (es. Debug o Release)
-        entryPoint: '.cproject'  # Sostituisci con il tuo file .cproject
+        #entryPoint: '.cproject'  # Sostituisci con il tuo file .cproject
