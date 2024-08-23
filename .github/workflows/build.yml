@@ -17,7 +17,7 @@ jobs:
       uses: actions/checkout@v2
     
     - name: List directory contents
-      run: ls -R
+      run: ls -lha
 
 
     - name: STM32CubeIDE build
