@@ -1,0 +1,23 @@
+name: STM32 Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: STM32CubeIDE build
+      uses: xanderhendriks/action-build-stm32cubeide@v2.2
+      with:
+        project-path: '.'  # Usa la cartella principale del progetto
+        build-config: 'Debug'  # O 'Release' a seconda delle tue esigenze
