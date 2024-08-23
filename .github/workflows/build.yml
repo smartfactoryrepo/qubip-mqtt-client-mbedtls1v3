@@ -17,7 +17,7 @@ jobs:
       uses: actions/checkout@v2
 
     - name: STM32CubeIDE build
-      uses: xanderhendriks/action-build-stm32cubeide@v2.2
+      uses: xanderhendriks/action-build-stm32cubeide@v13.0
       with:
         project-path: '.'  # Usa la cartella principale del progetto
         build-config: 'Debug'  # O 'Release' a seconda delle tue esigenze
