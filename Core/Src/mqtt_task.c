@@ -78,7 +78,7 @@ void MqttClientSubTask(void const *argument)
  */
 void MqttClientPubTask(void const *argument)
 {
-	char str[50];
+	char str[256];
 	MQTTMessage message;
 
 	uint32_t ulNotifiedValue = 0;
@@ -149,7 +149,14 @@ void MqttClientPubTask(void const *argument)
 			}
 
 			// Composing the message to be sent
-			snprintf(str, sizeof(str), "MQTT message from STM32: %lu", ulNotifiedValue);
+			snprintf(str, sizeof(str),
+			         "{\n"
+			         "  \"device\": \"STM32\",\n"
+			         "  \"data\": %lu\n"
+			         "}",
+			         ulNotifiedValue
+			        );
+			//snprintf(str, sizeof(str), "MQTT message from STM32: %lu", ulNotifiedValue);
 			message.payload = (void*)str;
 			message.payloadlen = strlen(str);
 

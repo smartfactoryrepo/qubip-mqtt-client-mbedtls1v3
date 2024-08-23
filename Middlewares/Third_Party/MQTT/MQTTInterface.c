@@ -49,7 +49,7 @@ mbedtls_pk_context pkey;
 #endif
 
 const char mbedtls_root_certificate[] =
-		"-----BEGIN CERTIFICATE-----\r\n"
+			"-----BEGIN CERTIFICATE-----\r\n"
 		    "MIIDlTCCAn2gAwIBAgIUKCfpw6t5lK6GDuZDtgD9w7FHqEMwDQYJKoZIhvcNAQEL\r\n"
 		    "BQAwWjELMAkGA1UEBhMCaXQxCzAJBgNVBAgMAmFsMQswCQYDVQQHDAJ0cDELMAkG\r\n"
 		    "A1UECgwCc2YxCzAJBgNVBAsMAmViMRcwFQYDVQQDDA4xOTIuMTY4LjEwMS42MzAe\r\n"
