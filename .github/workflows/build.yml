@@ -15,9 +15,14 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
+    
+    - name: List directory contents
+      run: ls -R
+
 
     - name: STM32CubeIDE build
       uses: xanderhendriks/action-build-stm32cubeide@v13.0
       with:
         project-path: '.'  # Specifica la cartella principale del progetto
-        project-target: 'Debug'  # Specifica il target di build (es. Debug o Release)
+        project-target: 'target/Debug'  # Specifica il target di build (es. Debug o Release)
+        entryPoint: '.cproject'  # Sostituisci con il tuo file .cproject
