@@ -1,3 +1,5 @@
+[![STM32 Build](https://github.com/smartfactoryrepo/qubip-mqtt-client-mbedtls1v3/actions/workflows/build.yml/badge.svg)](https://github.com/smartfactoryrepo/qubip-mqtt-client-mbedtls1v3/actions/workflows/build.yml)
+
 # MQTT Client Example with TLS 1.3 Encryption on NUCLEO-F429ZI
 
 This example demonstrates how to establish a secure connection to a MQTT broker using TLS v1.3 encryption on a NUCLEO-F429ZI board.
