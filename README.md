@@ -1,6 +1,6 @@
 
 
-# MQTT Client Example with TLS 1.3 Encryption on NUCLEO-F429ZI
+# MQTT Client Example with TLS 1.3 Encryption on NUCLEO-F429ZI with temperature sensor
 
 This example demonstrates how to establish a secure connection to a MQTT broker using TLS v1.3 encryption on a NUCLEO-F429ZI board. It subsequently establishes a Modbus TCP connection to a PLC, reads a holding register, and transmits its value to the MQTT broker. The register is then incremented by one, updated on the PLC, and this cycle repeats continuously. In this example, a DS18B20 one-wire temperature sensor is used. The temperature is read and sent to the MQTT broker on another topic.
 
