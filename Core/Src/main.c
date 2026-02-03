@@ -26,7 +26,6 @@
 #include "gpio.h"
 #include "rng.h"
 #include "leds.h"
-
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -225,6 +224,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART3_UART_Init();
+  MX_UART5_Init();
   MX_RNG_Init();
   MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
@@ -295,6 +295,10 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+
+  /** Enables the Clock Security System
+  */
+  HAL_RCC_EnableCSS();
 }
 
 /* USER CODE BEGIN 4 */

@@ -294,7 +294,8 @@ void StartDefaultTask(void const * argument)
 
   // Stack size calculated with static stack analyzer
   // Publish mqtt task
-  osThreadDef(mqttClientPubTask, MqttClientPubTask, osPriorityNormal, 0, (8.5 * 1024) / sizeof( StackType_t ) );
+  //osThreadDef(mqttClientPubTask, MqttClientPubTask, osPriorityNormal, 0, (8.5 * 1024) / sizeof( StackType_t ) );
+  osThreadDef(mqttClientPubTask, MqttClientPubTask, osPriorityNormal, 0, (9.5 * 1024) / sizeof( StackType_t ) );
   mqttClientPubTaskHandle = osThreadCreate(osThread(mqttClientPubTask), NULL);
   if(mqttClientPubTaskHandle == NULL)
   {

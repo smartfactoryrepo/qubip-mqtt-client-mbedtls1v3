@@ -98,14 +98,16 @@ void Error_Handler(void);
 #define RMII_TXD0_GPIO_Port GPIOG
 #define LD2_Pin GPIO_PIN_7
 #define LD2_GPIO_Port GPIOB
+#define ONEWIRE_Pin GPIO_PIN_12
+#define ONEWIRE_GPIO_Port GPIOC
 /* USER CODE BEGIN Private defines */
 
 // ----------------------------------------------------------------------------
 // MODBUS Configuration Defines
 // ----------------------------------------------------------------------------
 
-#define MOBBUS_PLC_IP 		"192.168.101.212"
-#define MODBUS_PLC_PORT 	"502"
+#define MOBBUS_PLC_IP 		"192.168.101.40"
+#define MODBUS_PLC_PORT 	"5002"
 #define MODBUS_PLC_REGISTER 32770
 
 // ----------------------------------------------------------------------------
